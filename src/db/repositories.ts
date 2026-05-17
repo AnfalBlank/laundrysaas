@@ -386,3 +386,284 @@ export async function listStaff() {
     .leftJoin(branches, eq(users.branchId, branches.id))
     .where(eq(users.tenantId, tenantId));
 }
+
+
+// ============ MUTATIONS ============
+
+// Create new order
+export async function createOrder(input: {
+  customerId?: string;
+  customerName?: string;
+  customerPhone?: string;
+  customerAddress?: string;
+  branchId?: string;
+  serviceId: string;
+  qty: number;
+  pickupType: "walk_in" | "pickup";
+  pickupAddress?: string;
+  isExpress?: boolean;
+  notes?: string;
+}) {
+  const tenantId = getCurrentTenantId();
+
+  // Find or create customer
+  let customerId = input.customerId;
+  if (!customerId && input.customerPhone) {
+    const [existing] = await db
+      .select()
+      .from(customers)
+      .where(and(eq(customers.tenantId, tenantId), eq(customers.phone, input.customerPhone)))
+      .limit(1);
+    if (existing) {
+      customerId = existing.id;
+    } else if (input.customerName) {
+      customerId = generateId("cst");
+      await db.insert(customers).values({
+        id: customerId,
+        tenantId,
+        name: input.customerName,
+        phone: input.customerPhone,
+        address: input.customerAddress,
+      });
+    }
+  }
+  if (!customerId) throw new Error("Customer required");
+
+  // Get service for price
+  const [svc] = await db
+    .select()
+    .from(services)
+    .where(and(eq(services.tenantId, tenantId), eq(services.id, input.serviceId)))
+    .limit(1);
+  if (!svc) throw new Error("Service not found");
+
+  const total = svc.price * input.qty;
+  const orderId = generateId("ord");
+  const itemId = generateId("itm");
+
+  // Generate invoice number
+  const today = new Date();
+  const datePart = today.toISOString().slice(0, 10).replace(/-/g, "");
+  const [{ count }] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(orders)
+    .where(and(
+      eq(orders.tenantId, tenantId),
+      sql`${orders.createdAt} >= ${Math.floor(new Date(today.toDateString()).getTime() / 1000)}`,
+    ));
+  const invoiceNumber = `INV-${datePart}-${String(Number(count) + 1).padStart(3, "0")}`;
+
+  const estimatedAt = new Date();
+  estimatedAt.setDate(estimatedAt.getDate() + (input.isExpress ? 1 : svc.durationDays));
+
+  // Insert order
+  await db.insert(orders).values({
+    id: orderId,
+    tenantId,
+    branchId: input.branchId,
+    customerId,
+    invoiceNumber,
+    status: input.pickupType === "pickup" ? "WAITING_PICKUP" : "RECEIVED",
+    paymentStatus: "unpaid",
+    pickupType: input.pickupType,
+    pickupAddress: input.pickupAddress,
+    isExpress: input.isExpress ?? false,
+    notes: input.notes,
+    weight: svc.pricingType === "per_kg" ? input.qty : null,
+    subtotal: total,
+    total,
+    estimatedAt,
+  });
+
+  // Insert order item
+  await db.insert(orderItems).values({
+    id: itemId,
+    orderId,
+    serviceId: svc.id,
+    serviceName: svc.name,
+    qty: input.qty,
+    pricePerUnit: svc.price,
+    total,
+  });
+
+  return { id: orderId, invoiceNumber, total };
+}
+
+// Update order status
+export async function updateOrderStatus(orderId: string, status: string) {
+  const tenantId = getCurrentTenantId();
+  await db
+    .update(orders)
+    .set({
+      status: status as never,
+      updatedAt: new Date(),
+      ...(status === "COMPLETED" ? { completedAt: new Date() } : {}),
+    })
+    .where(and(eq(orders.id, orderId), eq(orders.tenantId, tenantId)));
+}
+
+// Cancel order
+export async function cancelOrder(orderId: string) {
+  await updateOrderStatus(orderId, "CANCELLED");
+}
+
+// Record payment
+export async function recordPayment(input: {
+  orderId: string;
+  amount: number;
+  method: "cash" | "transfer" | "qris" | "ewallet";
+  reference?: string;
+}) {
+  const payId = generateId("pay");
+  await db.insert(payments).values({
+    id: payId,
+    orderId: input.orderId,
+    amount: input.amount,
+    method: input.method,
+    reference: input.reference,
+  });
+
+  // Update order payment status
+  const [{ paid }] = await db
+    .select({ paid: sql<number>`coalesce(sum(${payments.amount}), 0)` })
+    .from(payments)
+    .where(eq(payments.orderId, input.orderId));
+
+  const [order] = await db
+    .select({ total: orders.total })
+    .from(orders)
+    .where(eq(orders.id, input.orderId));
+
+  if (!order) throw new Error("Order not found");
+
+  const status = Number(paid) >= order.total ? "paid" : "partial";
+  await db
+    .update(orders)
+    .set({ paymentStatus: status, updatedAt: new Date() })
+    .where(eq(orders.id, input.orderId));
+
+  return { id: payId };
+}
+
+// Create customer
+export async function createCustomer(input: {
+  name: string;
+  phone: string;
+  address?: string;
+  notes?: string;
+}) {
+  const tenantId = getCurrentTenantId();
+  const id = generateId("cst");
+  await db.insert(customers).values({
+    id,
+    tenantId,
+    name: input.name,
+    phone: input.phone,
+    address: input.address,
+    notes: input.notes,
+  });
+  return { id };
+}
+
+// Create service
+export async function createService(input: {
+  name: string;
+  category: "regular" | "express" | "special";
+  pricingType: "per_kg" | "per_item" | "per_unit";
+  price: number;
+  durationDays: number;
+}) {
+  const tenantId = getCurrentTenantId();
+  const id = generateId("svc");
+  await db.insert(services).values({
+    id,
+    tenantId,
+    name: input.name,
+    category: input.category,
+    pricingType: input.pricingType,
+    price: input.price,
+    durationDays: input.durationDays,
+  });
+  return { id };
+}
+
+// Create pickup
+export async function createPickup(input: {
+  orderId: string;
+  driverId?: string;
+  type: "pickup" | "delivery";
+  address?: string;
+  scheduledAt: Date;
+}) {
+  const tenantId = getCurrentTenantId();
+  const id = generateId("pck");
+  await db.insert(pickups).values({
+    id,
+    tenantId,
+    orderId: input.orderId,
+    driverId: input.driverId,
+    type: input.type,
+    status: "scheduled",
+    address: input.address,
+    scheduledAt: input.scheduledAt,
+  });
+  return { id };
+}
+
+// Update pickup status
+export async function updatePickupStatus(
+  pickupId: string,
+  status: "scheduled" | "ongoing" | "completed" | "cancelled"
+) {
+  await db
+    .update(pickups)
+    .set({
+      status,
+      ...(status === "completed" ? { completedAt: new Date() } : {}),
+    })
+    .where(eq(pickups.id, pickupId));
+}
+
+// Adjust inventory stock
+export async function adjustInventoryStock(input: {
+  inventoryId: string;
+  delta: number;
+  reason: string;
+}) {
+  const tenantId = getCurrentTenantId();
+  const [item] = await db
+    .select()
+    .from(inventory)
+    .where(and(eq(inventory.id, input.inventoryId), eq(inventory.tenantId, tenantId)));
+  if (!item) throw new Error("Item not found");
+
+  const newStock = Math.max(0, item.stock + input.delta);
+  await db
+    .update(inventory)
+    .set({ stock: newStock })
+    .where(eq(inventory.id, input.inventoryId));
+
+  return { stock: newStock };
+}
+
+// Create inventory item
+export async function createInventoryItem(input: {
+  name: string;
+  category: string;
+  unit: string;
+  stock: number;
+  minimumStock: number;
+}) {
+  const tenantId = getCurrentTenantId();
+  const id = generateId("inv");
+  await db.insert(inventory).values({
+    id,
+    tenantId,
+    name: input.name,
+    category: input.category,
+    unit: input.unit,
+    stock: input.stock,
+    minimumStock: input.minimumStock,
+  });
+  return { id };
+}

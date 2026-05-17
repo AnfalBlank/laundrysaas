@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { listCustomers, getCustomerStats } from "@/db/repositories";
+import { listCustomers, getCustomerStats, createCustomer } from "@/db/repositories";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +14,21 @@ export async function GET(req: Request) {
     ]);
     return NextResponse.json({ customers, stats });
   } catch (err) {
-    console.error("Customers API error:", err);
+    console.error(err);
     return NextResponse.json({ error: "Failed to load" }, { status: 500 });
+  }
+}
+
+export async function POST(req: Request) {
+  try {
+    const body = await req.json();
+    if (!body.name || !body.phone) {
+      return NextResponse.json({ error: "Name and phone required" }, { status: 400 });
+    }
+    const result = await createCustomer(body);
+    return NextResponse.json(result, { status: 201 });
+  } catch (err) {
+    console.error(err);
+    return NextResponse.json({ error: String(err) }, { status: 500 });
   }
 }

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Icon3D } from "@/components/ui/icon3d";
+import { useToast } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
 import { Building2, Globe, Palette, Plug, Receipt, Shield, MessageCircleMore, CreditCard, Map, Cloud, Bot } from "lucide-react";
 
@@ -30,6 +31,11 @@ const integrations = [
 
 export default function SettingsPage() {
   const [active, setActive] = useState("business");
+  const toast = useToast();
+
+  const handleSave = () => toast.success("Perubahan disimpan", "Pengaturan ter-update");
+  const handleAction = (label: string) =>
+    toast.info(label, "Fitur ini akan tersedia di update berikutnya");
 
   return (
     <AppShell title="Settings" subtitle="Pengaturan akun dan sistem">
@@ -79,8 +85,8 @@ export default function SettingsPage() {
                 <Field label="Mata Uang" defaultValue="IDR (Rupiah)" />
               </div>
               <div className="px-4 sm:px-5 pb-5 flex flex-col sm:flex-row sm:justify-end gap-2">
-                <Button variant="secondary">Batal</Button>
-                <Button>Simpan Perubahan</Button>
+                <Button variant="secondary" type="button">Batal</Button>
+                <Button type="button" onClick={handleSave}>Simpan Perubahan</Button>
               </div>
             </Card>
           )}
@@ -115,6 +121,12 @@ export default function SettingsPage() {
                           variant={i.connected ? "secondary" : "primary"}
                           size="sm"
                           className="mt-3"
+                          type="button"
+                          onClick={() =>
+                            handleAction(
+                              i.connected ? `Atur ${i.name}` : `Hubungkan ${i.name}`
+                            )
+                          }
                         >
                           {i.connected ? "Atur" : "Hubungkan"}
                         </Button>
@@ -146,6 +158,8 @@ export default function SettingsPage() {
                   <div className="mt-4 flex flex-col sm:flex-row sm:items-center gap-2">
                     <Button
                       variant="secondary"
+                      type="button"
+                      onClick={() => handleAction("Upgrade Enterprise")}
                       className="bg-white text-primary-700 hover:bg-slate-50 w-full sm:w-auto"
                     >
                       Upgrade Enterprise
@@ -198,12 +212,22 @@ export default function SettingsPage() {
                       <div className="text-sm font-bold text-slate-900">{b.staff}</div>
                       <div className="text-xs text-slate-500">staff</div>
                     </div>
-                    <Button variant="ghost" size="sm">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      type="button"
+                      onClick={() => handleAction(`Atur cabang ${b.name}`)}
+                    >
                       Atur
                     </Button>
                   </div>
                 ))}
-                <Button className="w-full" variant="outline">
+                <Button
+                  className="w-full"
+                  variant="outline"
+                  type="button"
+                  onClick={() => handleAction("Tambah Cabang Baru")}
+                >
                   + Tambah Cabang Baru
                 </Button>
               </div>

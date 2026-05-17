@@ -1,18 +1,25 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Icon3D } from "@/components/ui/icon3d";
 import { WashingMachine3D } from "@/components/ui/laundry-icons";
+import { useToast } from "@/components/ui/toast";
+import { OrderFormModal } from "./order-form-modal";
+import { OrderDetailModal } from "./order-detail-modal";
+import { PrintInvoice } from "./print-invoice";
 import {
   statusLabels,
   statusColors,
   type OrderStatus,
 } from "@/lib/dummy-data";
 import { cn, formatCurrency, formatDateTime } from "@/lib/utils";
+import { exportToCSV } from "@/lib/export";
+import type { Service, Branch } from "@/db/schema";
 import {
   Plus,
   Search,
@@ -23,6 +30,7 @@ import {
   MoreHorizontal,
   Phone,
   CheckCircle2,
+  Eye,
 } from "lucide-react";
 
 const statusFilters: ("ALL" | OrderStatus)[] = [
@@ -53,9 +61,22 @@ interface OrderRow {
   service: string;
 }
 
-export function OrdersView({ initialOrders }: { initialOrders: OrderRow[] }) {
+export function OrdersView({
+  initialOrders,
+  services,
+  branches,
+}: {
+  initialOrders: OrderRow[];
+  services: Service[];
+  branches: Branch[];
+}) {
+  const router = useRouter();
+  const toast = useToast();
   const [filter, setFilter] = useState<"ALL" | OrderStatus>("ALL");
   const [query, setQuery] = useState("");
+  const [showCreate, setShowCreate] = useState(false);
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const [printOrder, setPrintOrder] = useState<OrderRow | null>(null);
 
   const filtered = useMemo(() => {
     return initialOrders.filter((o) => {
@@ -76,6 +97,58 @@ export function OrdersView({ initialOrders }: { initialOrders: OrderRow[] }) {
     return map;
   }, [initialOrders]);
 
+  const handleExport = () => {
+    if (filtered.length === 0) {
+      toast.warning("Tidak ada data", "List kosong, tidak ada yang di-export");
+      return;
+    }
+    exportToCSV(
+      filtered.map((o) => ({
+        Invoice: o.invoice,
+        Customer: o.customerName ?? "",
+        Phone: o.customerPhone ?? "",
+        Service: o.service,
+        Weight: o.weight ?? "",
+        Status: statusLabels[o.status as OrderStatus] ?? o.status,
+        "Payment Status": o.paymentStatus,
+        Pickup: o.pickupType,
+        Branch: o.branchName ?? "",
+        Total: o.total,
+        Created: o.createdAt ? formatDateTime(o.createdAt) : "",
+        Estimated: o.estimatedAt ? formatDateTime(o.estimatedAt) : "",
+      })),
+      `orders-${new Date().toISOString().slice(0, 10)}.csv`
+    );
+    toast.success("Export berhasil", `${filtered.length} order ter-export`);
+  };
+
+  const handlePrint = (order: OrderRow) => {
+    setPrintOrder(order);
+    // Print will trigger via PrintInvoice component
+    setTimeout(() => {
+      window.print();
+      setTimeout(() => setPrintOrder(null), 500);
+    }, 200);
+  };
+
+  const handleShowQR = (order: OrderRow) => {
+    const url = `${window.location.origin}/track/${order.invoice}`;
+    if (navigator.share) {
+      navigator
+        .share({ title: `Tracking ${order.invoice}`, url })
+        .catch(() => copyToClipboard(url));
+    } else {
+      copyToClipboard(url);
+    }
+  };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text).then(
+      () => toast.success("Tersalin", "Link tracking sudah di-copy"),
+      () => toast.error("Gagal copy", "Browser tidak support")
+    );
+  };
+
   return (
     <>
       {/* Action bar */}
@@ -90,17 +163,26 @@ export function OrdersView({ initialOrders }: { initialOrders: OrderRow[] }) {
               className="pl-9"
             />
           </div>
-          <Button variant="secondary" size="icon" aria-label="Filter">
+          <Button variant="secondary" size="icon" aria-label="Filter" type="button">
             <Filter size={16} />
           </Button>
         </div>
 
         <div className="flex items-center gap-2">
-          <Button variant="secondary" className="flex-1 sm:flex-none">
+          <Button
+            variant="secondary"
+            className="flex-1 sm:flex-none"
+            onClick={handleExport}
+            type="button"
+          >
             <Download size={16} />
-            <span className="hidden sm:inline">Export</span>
+            <span className="hidden sm:inline">Export CSV</span>
           </Button>
-          <Button className="flex-1 sm:flex-none">
+          <Button
+            className="flex-1 sm:flex-none"
+            onClick={() => setShowCreate(true)}
+            type="button"
+          >
             <Plus size={16} /> Order Baru
           </Button>
         </div>
@@ -168,16 +250,6 @@ export function OrdersView({ initialOrders }: { initialOrders: OrderRow[] }) {
                 </div>
               </div>
               <div>
-                <div className="text-slate-500">Cabang</div>
-                <div className="font-semibold text-slate-900 truncate">{o.branchName ?? "—"}</div>
-              </div>
-              <div>
-                <div className="text-slate-500">Estimasi</div>
-                <div className="font-semibold text-slate-900">
-                  {o.estimatedAt ? formatDateTime(o.estimatedAt) : "—"}
-                </div>
-              </div>
-              <div>
                 <div className="text-slate-500">Total</div>
                 <div className="font-bold text-slate-900">{formatCurrency(o.total)}</div>
               </div>
@@ -189,21 +261,31 @@ export function OrdersView({ initialOrders }: { initialOrders: OrderRow[] }) {
                 ) : (
                   <Badge variant="warning">Belum Bayar</Badge>
                 )}
-                {o.pickupType === "pickup" && (
-                  <Badge variant="primary">
-                    <CheckCircle2 size={10} /> Pickup
-                  </Badge>
-                )}
               </div>
               <div className="flex items-center gap-1">
-                <button className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-slate-500 hover:bg-primary-50 hover:text-primary-600">
+                <button
+                  onClick={() => setSelectedOrderId(o.id)}
+                  className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-slate-500 hover:bg-blue-50 hover:text-blue-600"
+                  type="button"
+                  aria-label="Detail"
+                >
+                  <Eye size={14} />
+                </button>
+                <button
+                  onClick={() => handlePrint(o)}
+                  className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-slate-500 hover:bg-primary-50 hover:text-primary-600"
+                  type="button"
+                  aria-label="Print"
+                >
                   <Printer size={14} />
                 </button>
-                <button className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-slate-500 hover:bg-accent-50 hover:text-accent-600">
+                <button
+                  onClick={() => handleShowQR(o)}
+                  className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-slate-500 hover:bg-accent-50 hover:text-accent-600"
+                  type="button"
+                  aria-label="Share"
+                >
                   <QrCode size={14} />
-                </button>
-                <button className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100">
-                  <MoreHorizontal size={14} />
                 </button>
               </div>
             </div>
@@ -230,7 +312,11 @@ export function OrdersView({ initialOrders }: { initialOrders: OrderRow[] }) {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filtered.map((o) => (
-                <tr key={o.id} className="hover:bg-slate-50/60 transition-colors">
+                <tr
+                  key={o.id}
+                  className="hover:bg-slate-50/60 transition-colors cursor-pointer"
+                  onClick={() => setSelectedOrderId(o.id)}
+                >
                   <td className="px-5 py-3.5">
                     <div className="font-mono text-xs font-semibold text-primary-700">
                       {o.invoice}
@@ -290,23 +376,37 @@ export function OrdersView({ initialOrders }: { initialOrders: OrderRow[] }) {
                   <td className="px-5 py-3.5 text-xs text-slate-600 whitespace-nowrap">
                     {o.estimatedAt ? formatDateTime(o.estimatedAt) : "—"}
                   </td>
-                  <td className="px-5 py-3.5">
+                  <td className="px-5 py-3.5" onClick={(e) => e.stopPropagation()}>
                     <div className="flex items-center justify-end gap-1">
                       <button
+                        onClick={() => setSelectedOrderId(o.id)}
+                        className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-slate-500 hover:bg-blue-50 hover:text-blue-600"
+                        title="Detail"
+                        type="button"
+                      >
+                        <Eye size={14} />
+                      </button>
+                      <button
+                        onClick={() => handlePrint(o)}
                         className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-slate-500 hover:bg-primary-50 hover:text-primary-600"
                         title="Cetak Invoice"
+                        type="button"
                       >
                         <Printer size={14} />
                       </button>
                       <button
+                        onClick={() => handleShowQR(o)}
                         className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-slate-500 hover:bg-accent-50 hover:text-accent-600"
-                        title="QR Code"
+                        title="Share Tracking Link"
+                        type="button"
                       >
                         <QrCode size={14} />
                       </button>
                       <button
+                        onClick={() => setSelectedOrderId(o.id)}
                         className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100"
                         title="More"
+                        type="button"
                       >
                         <MoreHorizontal size={14} />
                       </button>
@@ -321,7 +421,8 @@ export function OrdersView({ initialOrders }: { initialOrders: OrderRow[] }) {
         <div className="px-5 py-3.5 border-t border-slate-100 flex flex-col sm:flex-row items-start sm:items-center sm:justify-between gap-3 text-xs text-slate-500">
           <div>
             Menampilkan <span className="font-semibold text-slate-900">{filtered.length}</span>{" "}
-            dari <span className="font-semibold text-slate-900">{initialOrders.length}</span> order
+            dari <span className="font-semibold text-slate-900">{initialOrders.length}</span>{" "}
+            order
           </div>
         </div>
       </Card>
@@ -337,6 +438,28 @@ export function OrdersView({ initialOrders }: { initialOrders: OrderRow[] }) {
           </p>
         </Card>
       )}
+
+      {/* Modals */}
+      <OrderFormModal
+        open={showCreate}
+        onClose={() => setShowCreate(false)}
+        services={services}
+        branches={branches}
+        onSuccess={() => {
+          setShowCreate(false);
+          toast.success("Order dibuat", "Order baru berhasil disimpan");
+          router.refresh();
+        }}
+      />
+
+      <OrderDetailModal
+        orderId={selectedOrderId}
+        onClose={() => setSelectedOrderId(null)}
+        onUpdate={() => router.refresh()}
+      />
+
+      {/* Hidden print area */}
+      {printOrder && <PrintInvoice order={printOrder} />}
     </>
   );
 }

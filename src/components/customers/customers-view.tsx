@@ -1,11 +1,16 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Modal } from "@/components/ui/modal";
+import { Field, Textarea } from "@/components/ui/select";
 import { Icon3D } from "@/components/ui/icon3d";
 import { Crown3D, User3D } from "@/components/ui/laundry-icons";
+import { useToast } from "@/components/ui/toast";
+import { exportToCSV } from "@/lib/export";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import {
   MessageCircle,
@@ -16,6 +21,7 @@ import {
   User as UserIcon,
   RotateCcw,
   Moon,
+  Download,
 } from "lucide-react";
 
 interface CustomerRow {
@@ -41,8 +47,7 @@ const tierVariant: Record<string, Parameters<typeof Icon3D>[0]["variant"]> = {
   platinum: "purple",
 };
 
-const tierLabel = (t: string) =>
-  t.charAt(0).toUpperCase() + t.slice(1);
+const tierLabel = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
 
 export function CustomersView({
   initialCustomers,
@@ -51,8 +56,13 @@ export function CustomersView({
   initialCustomers: CustomerRow[];
   stats: { total: number; vip: number };
 }) {
+  const router = useRouter();
+  const toast = useToast();
   const [query, setQuery] = useState("");
   const [tier, setTier] = useState<string>("ALL");
+  const [showCreate, setShowCreate] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [form, setForm] = useState({ name: "", phone: "", address: "", notes: "" });
 
   const filtered = useMemo(() => {
     return initialCustomers.filter((c) => {
@@ -62,6 +72,59 @@ export function CustomersView({
       return matchesTier && matchesQuery;
     });
   }, [tier, query, initialCustomers]);
+
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.name.trim() || !form.phone.trim()) {
+      toast.error("Lengkapi data", "Nama dan no. HP wajib");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/customers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error ?? "Failed");
+      }
+      toast.success("Customer ditambahkan", form.name);
+      setShowCreate(false);
+      setForm({ name: "", phone: "", address: "", notes: "" });
+      router.refresh();
+    } catch (err) {
+      toast.error("Gagal menambah customer", String(err));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleExport = () => {
+    if (filtered.length === 0) {
+      toast.warning("Tidak ada data");
+      return;
+    }
+    exportToCSV(
+      filtered.map((c) => ({
+        Name: c.name,
+        Phone: c.phone,
+        Tier: tierLabel(c.tier),
+        "Total Orders": c.totalOrders,
+        "Total Spending": c.totalSpending,
+        Points: c.points,
+        "Created At": c.createdAt ? formatDate(c.createdAt) : "",
+      })),
+      `customers-${new Date().toISOString().slice(0, 10)}.csv`
+    );
+    toast.success("Export berhasil", `${filtered.length} customer ter-export`);
+  };
+
+  const chatWA = (phone: string) => {
+    const cleaned = phone.replace(/\D/g, "").replace(/^0/, "62");
+    window.open(`https://wa.me/${cleaned}`, "_blank");
+  };
 
   return (
     <>
@@ -75,7 +138,9 @@ export function CustomersView({
             <div className="text-xl sm:text-2xl font-bold text-slate-900 mt-1">
               {stats.total}
             </div>
-            <div className="text-[11px] text-green-600 font-semibold mt-1">+24 minggu ini</div>
+            <div className="text-[11px] text-green-600 font-semibold mt-1">
+              {filtered.length} ter-filter
+            </div>
           </div>
           <div className="shrink-0 scale-75 sm:scale-100 origin-top-right">
             <User3D className="w-12 h-12" />
@@ -142,6 +207,7 @@ export function CustomersView({
               <button
                 key={t}
                 onClick={() => setTier(t)}
+                type="button"
                 className={cn(
                   "px-3 py-1.5 rounded-full text-xs font-semibold border transition-all",
                   tier === t
@@ -153,7 +219,16 @@ export function CustomersView({
               </button>
             ))}
           </div>
-          <Button className="shrink-0">
+          <Button
+            variant="secondary"
+            onClick={handleExport}
+            type="button"
+            className="shrink-0"
+          >
+            <Download size={16} />
+            <span className="hidden sm:inline">Export</span>
+          </Button>
+          <Button onClick={() => setShowCreate(true)} type="button" className="shrink-0">
             <Plus size={16} />
             <span className="hidden sm:inline">Customer Baru</span>
             <span className="sm:hidden">Baru</span>
@@ -181,9 +256,7 @@ export function CustomersView({
                   )}
                 </Icon3D>
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-bold text-slate-900 truncate">{c.name}</h3>
-                  </div>
+                  <h3 className="font-bold text-slate-900 truncate">{c.name}</h3>
                   <p className="text-xs text-slate-500">{c.phone}</p>
                   <span
                     className={cn(
@@ -214,10 +287,21 @@ export function CustomersView({
               </div>
 
               <div className="flex items-center gap-2 mt-4">
-                <Button variant="secondary" className="flex-1" size="sm">
+                <Button
+                  variant="secondary"
+                  className="flex-1"
+                  size="sm"
+                  type="button"
+                  onClick={() => chatWA(c.phone)}
+                >
                   <MessageCircle size={14} /> Chat
                 </Button>
-                <Button className="flex-1" size="sm">
+                <Button
+                  className="flex-1"
+                  size="sm"
+                  type="button"
+                  onClick={() => toast.info("Detail belum tersedia", "Coming soon")}
+                >
                   Detail
                 </Button>
               </div>
@@ -242,6 +326,63 @@ export function CustomersView({
           </p>
         </Card>
       )}
+
+      {/* Create Modal */}
+      <Modal
+        open={showCreate}
+        onClose={() => setShowCreate(false)}
+        title="Customer Baru"
+        size="md"
+        footer={
+          <>
+            <Button
+              variant="secondary"
+              onClick={() => setShowCreate(false)}
+              disabled={submitting}
+              type="button"
+            >
+              Batal
+            </Button>
+            <Button onClick={handleCreate} disabled={submitting} type="submit" form="cust-form">
+              {submitting ? "Menyimpan..." : "Simpan"}
+            </Button>
+          </>
+        }
+      >
+        <form id="cust-form" onSubmit={handleCreate} className="space-y-3">
+          <Field label="Nama" required>
+            <Input
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              placeholder="Nama lengkap"
+              required
+            />
+          </Field>
+          <Field label="No. HP" required>
+            <Input
+              value={form.phone}
+              onChange={(e) => setForm({ ...form, phone: e.target.value })}
+              placeholder="0812-xxxx-xxxx"
+              required
+            />
+          </Field>
+          <Field label="Alamat">
+            <Input
+              value={form.address}
+              onChange={(e) => setForm({ ...form, address: e.target.value })}
+              placeholder="Alamat lengkap (opsional)"
+            />
+          </Field>
+          <Field label="Catatan">
+            <Textarea
+              value={form.notes}
+              onChange={(e) => setForm({ ...form, notes: e.target.value })}
+              placeholder="Catatan internal (opsional)"
+              rows={2}
+            />
+          </Field>
+        </form>
+      </Modal>
     </>
   );
 }

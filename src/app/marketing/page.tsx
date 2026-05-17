@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Icon3D } from "@/components/ui/icon3d";
 import { Sparkles3D } from "@/components/ui/laundry-icons";
+import { useToast } from "@/components/ui/toast";
 import { ArrowRight, Crown, Megaphone, Plus, RotateCcw, Send, Sparkles, Star, Users, Moon } from "lucide-react";
 
 const campaigns = [
@@ -46,6 +47,9 @@ const segments = [
 ];
 
 export default function MarketingPage() {
+  const toast = useToast();
+  const handleAction = (label: string) =>
+    toast.info(label, "Fitur akan segera tersedia di update berikutnya");
   return (
     <AppShell title="Marketing" subtitle="Broadcast WhatsApp, promo, dan retensi customer">
       {/* AI Generator hero */}
@@ -71,6 +75,8 @@ export default function MarketingPage() {
           <Button
             variant="secondary"
             size="lg"
+            type="button"
+            onClick={() => handleAction("AI Promo Generator")}
             className="shrink-0 bg-white text-primary-700 hover:bg-slate-50 w-full md:w-auto"
           >
             <Sparkles size={16} /> Buat Promo
@@ -114,6 +120,8 @@ export default function MarketingPage() {
           <div className="p-3 space-y-2">
             {segments.map((s) => (
               <button
+                type="button"
+                onClick={() => handleAction(`Segment: ${s.name}`)}
                 key={s.name}
                 className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 transition-colors border border-transparent hover:border-primary-200"
               >
@@ -139,7 +147,7 @@ export default function MarketingPage() {
               <CardTitle>Campaign Terbaru</CardTitle>
               <p className="text-xs text-slate-500 mt-0.5">Performa broadcast WhatsApp</p>
             </div>
-            <Button>
+            <Button type="button" onClick={() => handleAction("Buat Campaign")}>
               <Plus size={16} /> Campaign Baru
             </Button>
           </CardHeader>
