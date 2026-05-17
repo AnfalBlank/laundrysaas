@@ -24,7 +24,6 @@ Platform ERP Laundry berbasis SaaS dengan WhatsApp automation, pickup &amp; deli
 ## Cepat Mulai
 
 ```bash
-cd frontend
 npm install
 cp .env.example .env.local   # isi TURSO_DATABASE_URL & TURSO_AUTH_TOKEN
 npm run db:push              # push schema ke Turso
@@ -55,6 +54,16 @@ npm run dev                  # http://localhost:3000
 | Styling     | Tailwind CSS                          |
 | Charts      | Recharts                              |
 | Icons       | Lucide React + custom 3D SVG          |
+
+## Deployment ke Vercel
+
+1. Import repo di [vercel.com/new](https://vercel.com/new)
+2. Tambahkan Environment Variables:
+   - `TURSO_DATABASE_URL`
+   - `TURSO_AUTH_TOKEN`
+3. Deploy — Vercel auto-detect Next.js
+
+Lihat [Deployment Guide](./docs/technical/deployment.md) untuk detail.
 
 ## Lisensi
 
