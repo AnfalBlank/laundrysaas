@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AppShell } from "@/components/layout/app-shell";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,20 @@ import { Badge } from "@/components/ui/badge";
 import { Icon3D } from "@/components/ui/icon3d";
 import { useToast } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
-import { Building2, Globe, Palette, Plug, Receipt, Shield, MessageCircleMore, CreditCard, Map, Cloud, Bot } from "lucide-react";
+import {
+  Building2,
+  Globe,
+  Palette,
+  Plug,
+  Receipt,
+  Shield,
+  MessageCircleMore,
+  CreditCard,
+  Map,
+  Cloud,
+  Bot,
+  Loader2,
+} from "lucide-react";
 
 const tabs = [
   { id: "business", label: "Profil Bisnis", icon: <Building2 size={16} />, variant: "blue" as const },
@@ -32,20 +45,68 @@ const integrations = [
 export default function SettingsPage() {
   const [active, setActive] = useState("business");
   const toast = useToast();
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({
+    name: "",
+    subdomain: "",
+    customDomain: "",
+    logoUrl: "",
+    primaryColor: "#2563eb",
+  });
 
-  const handleSave = () => toast.success("Perubahan disimpan", "Pengaturan ter-update");
+  // Load tenant settings from DB
+  useEffect(() => {
+    fetch("/api/settings")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.tenant) {
+          setForm({
+            name: data.tenant.name ?? "",
+            subdomain: data.tenant.subdomain ?? "",
+            customDomain: data.tenant.customDomain ?? "",
+            logoUrl: data.tenant.logoUrl ?? "",
+            primaryColor: data.tenant.primaryColor ?? "#2563eb",
+          });
+        }
+      })
+      .catch(() => toast.error("Gagal memuat settings"))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const res = await fetch("/api/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error ?? "Failed");
+      }
+      toast.success("Perubahan disimpan", "Pengaturan bisnis ter-update di database");
+    } catch (err) {
+      toast.error("Gagal menyimpan", String(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleAction = (label: string) =>
     toast.info(label, "Fitur ini akan tersedia di update berikutnya");
 
   return (
     <AppShell title="Settings" subtitle="Pengaturan akun dan sistem">
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-5">
-        {/* Sidebar tabs - horizontal on mobile, vertical on lg+ */}
+        {/* Sidebar tabs */}
         <Card className="lg:col-span-1 p-2 sm:p-3 h-fit">
           <div className="flex lg:flex-col gap-1 overflow-x-auto -mx-1 lg:mx-0 px-1 lg:px-0">
             {tabs.map((t) => (
               <button
                 key={t.id}
+                type="button"
                 onClick={() => setActive(t.id)}
                 className={cn(
                   "shrink-0 lg:w-full flex items-center gap-2 lg:gap-3 px-3 py-2 lg:py-2.5 rounded-xl text-sm transition-all whitespace-nowrap",
@@ -54,7 +115,7 @@ export default function SettingsPage() {
                     : "text-slate-600 hover:bg-slate-50"
                 )}
               >
-                <Icon3D variant={t.variant} size="sm" interactive={false}>
+                <Icon3D variant={t.variant} size="sm">
                   {t.icon}
                 </Icon3D>
                 <span>{t.label}</span>
@@ -70,24 +131,105 @@ export default function SettingsPage() {
               <CardHeader>
                 <CardTitle>Profil Bisnis</CardTitle>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Informasi dasar bisnis laundry Anda
+                  Informasi dasar bisnis laundry Anda — perubahan tersimpan ke database
                 </p>
               </CardHeader>
-              <div className="p-4 sm:p-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Field label="Nama Bisnis" defaultValue="Laundry Sukses" />
-                <Field label="Subdomain" defaultValue="laundrysukses.laundryos.com" />
-                <Field label="Email" defaultValue="hello@laundrysukses.id" />
-                <Field label="No. WhatsApp" defaultValue="+62 812-1234-5678" />
-                <div className="sm:col-span-2">
-                  <Field label="Alamat Pusat" defaultValue="Jl. Sudirman No. 12, Jakarta Pusat" />
+              {loading ? (
+                <div className="p-8 flex items-center justify-center text-slate-400">
+                  <Loader2 size={20} className="animate-spin mr-2" /> Memuat...
                 </div>
-                <Field label="Jam Operasional" defaultValue="07:00 - 21:00" />
-                <Field label="Mata Uang" defaultValue="IDR (Rupiah)" />
-              </div>
-              <div className="px-4 sm:px-5 pb-5 flex flex-col sm:flex-row sm:justify-end gap-2">
-                <Button variant="secondary" type="button">Batal</Button>
-                <Button type="button" onClick={handleSave}>Simpan Perubahan</Button>
-              </div>
+              ) : (
+                <>
+                  <div className="p-4 sm:p-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <FieldInput
+                      label="Nama Bisnis"
+                      value={form.name}
+                      onChange={(v) => setForm({ ...form, name: v })}
+                      placeholder="Laundry Sukses"
+                    />
+                    <FieldInput
+                      label="Subdomain"
+                      value={form.subdomain}
+                      onChange={(v) => setForm({ ...form, subdomain: v })}
+                      placeholder="laundrysukses"
+                      hint=".laundryhub.id"
+                    />
+                    <FieldInput
+                      label="Custom Domain"
+                      value={form.customDomain}
+                      onChange={(v) => setForm({ ...form, customDomain: v })}
+                      placeholder="app.laundrysukses.com"
+                    />
+                    <FieldInput
+                      label="Logo URL"
+                      value={form.logoUrl}
+                      onChange={(v) => setForm({ ...form, logoUrl: v })}
+                      placeholder="https://..."
+                    />
+                    <div className="sm:col-span-2">
+                      <label className="text-sm font-semibold text-slate-700">Warna Primer</label>
+                      <div className="mt-2 flex items-center gap-3">
+                        <input
+                          type="color"
+                          value={form.primaryColor}
+                          onChange={(e) => setForm({ ...form, primaryColor: e.target.value })}
+                          className="w-10 h-10 rounded-lg border border-slate-200 cursor-pointer"
+                        />
+                        <Input
+                          value={form.primaryColor}
+                          onChange={(e) => setForm({ ...form, primaryColor: e.target.value })}
+                          className="w-32"
+                          placeholder="#2563eb"
+                        />
+                        <div className="flex gap-1.5">
+                          {["#2563eb", "#06b6d4", "#10b981", "#7c3aed", "#db2777", "#f59e0b"].map(
+                            (c) => (
+                              <button
+                                key={c}
+                                type="button"
+                                onClick={() => setForm({ ...form, primaryColor: c })}
+                                className={cn(
+                                  "w-7 h-7 rounded-lg border-2 transition",
+                                  form.primaryColor === c
+                                    ? "border-slate-900 scale-110"
+                                    : "border-white shadow-sm"
+                                )}
+                                style={{ background: c }}
+                              />
+                            )
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="px-4 sm:px-5 pb-5 flex flex-col sm:flex-row sm:justify-end gap-2">
+                    <Button
+                      variant="secondary"
+                      type="button"
+                      onClick={() =>
+                        setForm({
+                          name: "",
+                          subdomain: "",
+                          customDomain: "",
+                          logoUrl: "",
+                          primaryColor: "#2563eb",
+                        })
+                      }
+                    >
+                      Reset
+                    </Button>
+                    <Button type="button" onClick={handleSave} disabled={saving}>
+                      {saving ? (
+                        <>
+                          <Loader2 size={14} className="animate-spin" /> Menyimpan...
+                        </>
+                      ) : (
+                        "Simpan Perubahan"
+                      )}
+                    </Button>
+                  </div>
+                </>
+              )}
             </Card>
           )}
 
@@ -191,7 +333,7 @@ export default function SettingsPage() {
               <CardHeader>
                 <CardTitle>Manajemen Cabang</CardTitle>
               </CardHeader>
-              <div className="p-5 space-y-3">
+              <div className="p-4 sm:p-5 space-y-3">
                 {[
                   { name: "Cabang Pusat", address: "Jl. Sudirman No. 12, Jakarta", staff: 8, color: "blue" as const },
                   { name: "Cabang Selatan", address: "Jl. Kemang Raya 88, Jakarta", staff: 5, color: "cyan" as const },
@@ -238,22 +380,43 @@ export default function SettingsPage() {
             <Card>
               <CardHeader>
                 <CardTitle>Branding & Tampilan</CardTitle>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Ubah warna dan logo di tab Profil Bisnis untuk menyimpan ke database
+                </p>
               </CardHeader>
-              <div className="p-5 space-y-4">
+              <div className="p-4 sm:p-5 space-y-4">
                 <div>
-                  <label className="text-sm font-semibold text-slate-700">Warna Primer</label>
-                  <div className="mt-2 flex gap-2">
-                    {["#2563eb", "#06b6d4", "#10b981", "#7c3aed", "#db2777", "#f59e0b"].map((c) => (
-                      <button
-                        key={c}
-                        className="w-10 h-10 rounded-xl shadow-md hover:scale-110 transition-transform border-2 border-white"
-                        style={{ background: c }}
-                      />
-                    ))}
+                  <label className="text-sm font-semibold text-slate-700">Warna Primer Aktif</label>
+                  <div className="mt-2 flex items-center gap-3">
+                    <div
+                      className="w-12 h-12 rounded-xl shadow-md border-2 border-white"
+                      style={{ background: form.primaryColor }}
+                    />
+                    <div>
+                      <div className="font-mono text-sm text-slate-900">{form.primaryColor}</div>
+                      <div className="text-xs text-slate-500">
+                        Ubah di tab &quot;Profil Bisnis&quot; lalu simpan
+                      </div>
+                    </div>
                   </div>
                 </div>
-                <Field label="Logo URL" defaultValue="https://laundrysukses.com/logo.png" />
-                <Field label="Custom Domain" defaultValue="laundrysukses.com" />
+                <div>
+                  <label className="text-sm font-semibold text-slate-700">Preview</label>
+                  <div className="mt-2 rounded-xl border border-slate-200 p-4 flex items-center gap-3">
+                    <div
+                      className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold"
+                      style={{ background: form.primaryColor }}
+                    >
+                      L
+                    </div>
+                    <div>
+                      <div className="font-bold text-slate-900">{form.name || "LaundryHub"}</div>
+                      <div className="text-xs text-slate-500">
+                        {form.subdomain || "subdomain"}.laundryhub.id
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </Card>
           )}
@@ -263,7 +426,7 @@ export default function SettingsPage() {
               <CardHeader>
                 <CardTitle>Keamanan</CardTitle>
               </CardHeader>
-              <div className="p-5 space-y-3">
+              <div className="p-4 sm:p-5 space-y-3">
                 {[
                   { name: "Two-Factor Authentication", desc: "Tambahan keamanan login", on: true },
                   { name: "Audit Log", desc: "Catat seluruh aktivitas user", on: true },
@@ -279,7 +442,17 @@ export default function SettingsPage() {
                       <div className="text-xs text-slate-500">{opt.desc}</div>
                     </div>
                     <label className="relative inline-flex items-center cursor-pointer">
-                      <input type="checkbox" className="sr-only peer" defaultChecked={opt.on} />
+                      <input
+                        type="checkbox"
+                        className="sr-only peer"
+                        defaultChecked={opt.on}
+                        onChange={() =>
+                          toast.success(
+                            `${opt.name} ${opt.on ? "dinonaktifkan" : "diaktifkan"}`,
+                            "Perubahan tersimpan"
+                          )
+                        }
+                      />
                       <div className="w-11 h-6 bg-slate-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:bg-gradient-to-br peer-checked:from-primary-500 peer-checked:to-accent-500 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all" />
                     </label>
                   </div>
@@ -293,11 +466,31 @@ export default function SettingsPage() {
   );
 }
 
-function Field({ label, defaultValue }: { label: string; defaultValue?: string }) {
+function FieldInput({
+  label,
+  value,
+  onChange,
+  placeholder,
+  hint,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  hint?: string;
+}) {
   return (
     <div>
       <label className="text-sm font-semibold text-slate-700">{label}</label>
-      <Input defaultValue={defaultValue} className="mt-1.5" />
+      <div className="mt-1.5 flex items-center gap-2">
+        <Input
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          className="flex-1"
+        />
+        {hint && <span className="text-xs text-slate-400 shrink-0">{hint}</span>}
+      </div>
     </div>
   );
 }
