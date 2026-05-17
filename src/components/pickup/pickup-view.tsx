@@ -209,7 +209,7 @@ export function PickupView({
               <div className="text-xl sm:text-2xl font-bold text-slate-900 mt-1">{s.value}</div>
             </div>
             <div className="shrink-0 scale-75 sm:scale-100 origin-top-right">
-              <Icon3D variant={s.variant} size="lg" animate="float">
+              <Icon3D variant={s.variant} size="lg">
                 {s.icon}
               </Icon3D>
             </div>
@@ -250,7 +250,7 @@ export function PickupView({
                   <Icon3D
                     variant={p.type === "pickup" ? "orange" : "cyan"}
                     size="md"
-                    animate="float"
+                   
                   >
                     {p.type === "pickup" ? (
                       <Scooter3D className="w-7 h-7" />
@@ -381,7 +381,6 @@ export function PickupView({
                   <Icon3D
                     variant={driverColors[i % driverColors.length]}
                     size="md"
-                    animate={status === "ongoing" ? "wiggle" : "none"}
                   >
                     <Scooter3D className="w-7 h-7" />
                   </Icon3D>

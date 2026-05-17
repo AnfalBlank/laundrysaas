@@ -125,7 +125,7 @@ export function WhatsappView({ templates }: { templates: Template[] }) {
               <div className="text-xl sm:text-2xl font-bold text-slate-900 mt-1">{s.value}</div>
             </div>
             <div className="shrink-0 scale-75 sm:scale-100 origin-top-right">
-              <Icon3D variant={s.variant} size="lg" animate="float">
+              <Icon3D variant={s.variant} size="lg">
                 {s.icon}
               </Icon3D>
             </div>
@@ -159,7 +159,7 @@ export function WhatsappView({ templates }: { templates: Template[] }) {
                 className="rounded-2xl border border-slate-200 p-4 hover:border-primary-300 hover:shadow-md transition-all"
               >
                 <div className="flex items-start gap-3">
-                  <Icon3D variant={meta.variant} size="md" animate="float">
+                  <Icon3D variant={meta.variant} size="md">
                     {meta.icon}
                   </Icon3D>
                   <div className="flex-1 min-w-0">

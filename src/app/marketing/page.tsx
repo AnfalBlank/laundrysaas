@@ -100,7 +100,7 @@ export default function MarketingPage() {
               <div className="text-xl sm:text-2xl font-bold text-slate-900 mt-1">{s.value}</div>
             </div>
             <div className="shrink-0 scale-75 sm:scale-100 origin-top-right">
-              <Icon3D variant={s.v} size="lg" animate="float">
+              <Icon3D variant={s.v} size="lg">
                 {s.icon}
               </Icon3D>
             </div>
@@ -125,7 +125,7 @@ export default function MarketingPage() {
                 key={s.name}
                 className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 transition-colors border border-transparent hover:border-primary-200"
               >
-                <Icon3D variant={s.variant} size="md" animate="float">
+                <Icon3D variant={s.variant} size="md">
                   {s.icon}
                 </Icon3D>
                 <div className="flex-1 min-w-0 text-left">

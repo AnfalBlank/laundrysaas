@@ -6,7 +6,7 @@ import { WashingMachine3D } from "@/components/ui/laundry-icons";
 export default function NotFound() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50/30 to-cyan-50/40 p-6 text-center">
-      <Icon3D variant="cyan" size="xl" animate="float">
+      <Icon3D variant="cyan" size="xl">
         <WashingMachine3D className="w-12 h-12" />
       </Icon3D>
       <h1 className="text-3xl font-bold text-slate-900 mt-6">404</h1>

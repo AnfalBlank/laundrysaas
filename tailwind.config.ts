@@ -37,37 +37,13 @@ const config: Config = {
         sans: ["var(--font-inter)", "system-ui", "sans-serif"],
       },
       keyframes: {
-        float: {
-          "0%, 100%": { transform: "translateY(0px) rotate(0deg)" },
-          "50%": { transform: "translateY(-8px) rotate(2deg)" },
-        },
-        "spin-slow": {
-          to: { transform: "rotate(360deg)" },
-        },
-        wiggle: {
-          "0%, 100%": { transform: "rotate(-3deg)" },
-          "50%": { transform: "rotate(3deg)" },
-        },
-        bubble: {
-          "0%": { transform: "translateY(0) scale(1)", opacity: "0.7" },
-          "100%": { transform: "translateY(-40px) scale(1.5)", opacity: "0" },
-        },
         shimmer: {
           "0%": { backgroundPosition: "-200% 0" },
           "100%": { backgroundPosition: "200% 0" },
         },
-        "gradient-x": {
-          "0%, 100%": { backgroundPosition: "0% 50%" },
-          "50%": { backgroundPosition: "100% 50%" },
-        },
       },
       animation: {
-        float: "float 4s ease-in-out infinite",
-        "spin-slow": "spin-slow 6s linear infinite",
-        wiggle: "wiggle 2s ease-in-out infinite",
-        bubble: "bubble 3s ease-out infinite",
         shimmer: "shimmer 2s linear infinite",
-        "gradient-x": "gradient-x 8s ease infinite",
       },
       boxShadow: {
         "3d": "0 10px 30px -10px rgba(59, 130, 246, 0.4), 0 4px 8px -4px rgba(6, 182, 212, 0.3)",

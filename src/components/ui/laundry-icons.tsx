@@ -39,10 +39,10 @@ export function WashingMachine3D({ className }: Props) {
       <circle cx="26" cy="13" r="1.5" fill="#fff" />
       <circle cx="32" cy={32} r="16" fill="url(#wm-window)" />
       <circle cx="32" cy={32} r="16" fill="none" stroke="#0c4a6e" strokeWidth="2" />
-      <circle cx="28" cy={28} r="3" fill="url(#wm-bubble)" className="animate-float" />
-      <circle cx="36" cy={36} r="2.5" fill="url(#wm-bubble)" className="animate-float" style={{ animationDelay: "0.4s" }} />
-      <circle cx="34" cy={26} r="2" fill="url(#wm-bubble)" className="animate-float" style={{ animationDelay: "0.8s" }} />
-      <circle cx="26" cy={36} r="2" fill="url(#wm-bubble)" className="animate-float" style={{ animationDelay: "1.2s" }} />
+      <circle cx="28" cy={28} r="3" fill="url(#wm-bubble)" />
+      <circle cx="36" cy={36} r="2.5" fill="url(#wm-bubble)" />
+      <circle cx="34" cy={26} r="2" fill="url(#wm-bubble)" />
+      <circle cx="26" cy={36} r="2" fill="url(#wm-bubble)" />
       <circle cx="50" cy="13" r="2" fill="#22c55e" />
       <circle cx="50" cy="13" r="0.8" fill="#fff" />
     </svg>

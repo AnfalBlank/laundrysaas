@@ -27,7 +27,7 @@ export default function LoginPage() {
       <div className="relative flex items-center justify-center p-6 lg:p-12">
         <div className="w-full max-w-md">
           <Link href="/" className="inline-flex items-center gap-2.5 mb-10">
-            <Icon3D variant="blue" size="md" animate="float">
+            <Icon3D variant="blue" size="md">
               <Sparkles size={20} />
             </Icon3D>
             <div>
@@ -126,21 +126,21 @@ export default function LoginPage() {
 
       {/* Right: illustration panel */}
       <div className="relative hidden lg:flex items-center justify-center bg-gradient-to-br from-primary-600 via-primary-500 to-accent-500 text-white overflow-hidden">
-        <div className="absolute top-10 left-10 animate-float">
+        <div className="absolute top-10 left-10">
           <SoapBubbles3D className="w-20 h-20" />
         </div>
-        <div className="absolute top-1/4 right-12 animate-float" style={{ animationDelay: "1s" }}>
+        <div className="absolute top-1/4 right-12">
           <ShirtFolded3D className="w-16 h-16" />
         </div>
-        <div className="absolute bottom-1/3 left-16 animate-float" style={{ animationDelay: "2s" }}>
+        <div className="absolute bottom-1/3 left-16">
           <Hanger3D className="w-16 h-16" />
         </div>
-        <div className="absolute bottom-10 right-20 animate-float" style={{ animationDelay: "0.5s" }}>
+        <div className="absolute bottom-10 right-20">
           <SoapBubbles3D className="w-14 h-14" />
         </div>
 
         <div className="relative text-center px-12">
-          <WashingMachine3D className="w-44 h-44 mx-auto animate-float" />
+          <WashingMachine3D className="w-44 h-44 mx-auto" />
           <h2 className="text-3xl font-bold mt-6">Kelola laundry, lebih mudah</h2>
           <p className="mt-3 opacity-90 leading-relaxed">
             WhatsApp automation, pickup &amp; delivery, multi cabang, dan AI analytics dalam satu

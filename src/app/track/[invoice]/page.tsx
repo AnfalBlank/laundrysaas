@@ -95,7 +95,7 @@ export default async function TrackPage({
 
       <div className="relative max-w-3xl mx-auto px-4 sm:px-5 py-6 sm:py-8 md:py-12">
         <div className="flex items-center gap-3 mb-6 sm:mb-8">
-          <Icon3D variant="blue" size="md" animate="float">
+          <Icon3D variant="blue" size="md">
             <Sparkles size={20} />
           </Icon3D>
           <div>

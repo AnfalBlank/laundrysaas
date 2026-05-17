@@ -61,7 +61,7 @@ export function QuickActions() {
     <Card className="p-4 sm:p-5">
       <div className="flex items-center justify-between mb-3 sm:mb-4">
         <h3 className="font-semibold text-slate-900 text-sm sm:text-base">Aksi Cepat</h3>
-        <Icon3D variant="cyan" size="sm" animate="wiggle">
+        <Icon3D variant="cyan" size="sm">
           <Zap size={14} />
         </Icon3D>
       </div>

@@ -93,7 +93,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
       >
         {/* Logo + close button (sticky top within sidebar) */}
         <div className="px-4 sm:px-5 py-4 border-b border-slate-100 flex items-center gap-3 shrink-0">
-          <Icon3D variant="blue" size="md" animate="float">
+          <Icon3D variant="blue" size="md">
             <Sparkles size={22} />
           </Icon3D>
           <div className="flex-1 min-w-0">

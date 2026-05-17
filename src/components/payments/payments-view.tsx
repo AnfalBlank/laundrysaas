@@ -106,7 +106,7 @@ export function PaymentsView({
                 <div className="text-[11px] text-slate-500 mt-0.5">{m.count} transaksi</div>
               </div>
               <div className="shrink-0 scale-75 sm:scale-100 origin-top-right">
-                <Icon3D variant={meta.variant} size="lg" animate="float">
+                <Icon3D variant={meta.variant} size="lg">
                   {meta.icon}
                 </Icon3D>
               </div>
@@ -119,7 +119,7 @@ export function PaymentsView({
       <Card className="mt-4 sm:mt-5 p-4 sm:p-5 bg-gradient-to-br from-rose-50 to-orange-50 border-rose-200">
         <div className="flex flex-col sm:flex-row sm:items-center gap-3">
           <div className="flex items-start gap-3 flex-1 min-w-0">
-            <Icon3D variant="red" size="lg" animate="wiggle">
+            <Icon3D variant="red" size="lg">
               <Money3D className="w-9 h-9" />
             </Icon3D>
             <div className="flex-1 min-w-0">

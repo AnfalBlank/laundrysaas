@@ -64,7 +64,7 @@ export default async function StaffPage() {
               <div className="text-2xl sm:text-3xl font-bold text-slate-900 mt-1">{r.count}</div>
             </div>
             <div className="shrink-0 scale-75 sm:scale-100 origin-top-right">
-              <Icon3D variant={r.variant} size="lg" animate="float">
+              <Icon3D variant={r.variant} size="lg">
                 {r.icon}
               </Icon3D>
             </div>

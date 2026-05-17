@@ -1,7 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { useRef, useState, type ReactNode, type CSSProperties } from "react";
+import { type ReactNode, type CSSProperties } from "react";
 
 type Size = "sm" | "md" | "lg" | "xl";
 
@@ -42,60 +42,33 @@ interface Icon3DProps {
   size?: Size;
   variant?: Variant;
   className?: string;
+  /** @deprecated animation removed for static design */
   animate?: "float" | "wiggle" | "spin" | "none";
+  /** @deprecated tilt removed, kept for backward compat */
   interactive?: boolean;
 }
 
 /**
- * Interactive 3D icon container with mouse-tracking tilt effect.
- * Wraps any icon (lucide, emoji, svg) with a glossy 3D glass-morphism surface.
+ * Static 3D icon container — no animations, no tilt.
+ * Wraps any icon with a glossy glass-morphism gradient surface.
  */
 export function Icon3D({
   children,
   size = "md",
   variant = "blue",
   className,
-  animate = "none",
-  interactive = true,
 }: Icon3DProps) {
-  const ref = useRef<HTMLDivElement>(null);
-  const [tilt, setTilt] = useState({ x: 0, y: 0 });
   const v = variantStyles[variant];
-
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!interactive || !ref.current) return;
-    const rect = ref.current.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width - 0.5) * 20;
-    const y = ((e.clientY - rect.top) / rect.height - 0.5) * -20;
-    setTilt({ x: y, y: x });
-  };
-
-  const handleMouseLeave = () => setTilt({ x: 0, y: 0 });
-
-  const animClass =
-    animate === "float"
-      ? "animate-float"
-      : animate === "wiggle"
-      ? "animate-wiggle"
-      : animate === "spin"
-      ? "animate-spin-slow"
-      : "";
 
   const style = {
     "--from": v.from,
     "--to": v.to,
     "--shadow": v.shadow,
-    transform: interactive
-      ? `perspective(600px) rotateX(${tilt.x}deg) rotateY(${tilt.y}deg)`
-      : undefined,
   } as CSSProperties;
 
   return (
     <div
-      ref={ref}
-      onMouseMove={handleMouseMove}
-      onMouseLeave={handleMouseLeave}
-      className={cn("icon-3d shrink-0", sizeMap[size], animClass, className)}
+      className={cn("icon-3d shrink-0", sizeMap[size], className)}
       style={style}
     >
       <span className="text-white relative z-10 flex items-center justify-center w-full h-full">

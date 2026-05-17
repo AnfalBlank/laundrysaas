@@ -8,7 +8,6 @@ import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { Field, Textarea } from "@/components/ui/select";
 import { Icon3D } from "@/components/ui/icon3d";
-import { Crown3D, User3D } from "@/components/ui/laundry-icons";
 import { useToast } from "@/components/ui/toast";
 import { exportToCSV } from "@/lib/export";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
@@ -143,7 +142,9 @@ export function CustomersView({
             </div>
           </div>
           <div className="shrink-0 scale-75 sm:scale-100 origin-top-right">
-            <User3D className="w-12 h-12" />
+            <Icon3D variant="purple" size="lg">
+              <UserIcon size={24} />
+            </Icon3D>
           </div>
         </Card>
         <Card className="p-4 sm:p-5 flex items-center justify-between gap-2">
@@ -157,7 +158,9 @@ export function CustomersView({
             </div>
           </div>
           <div className="shrink-0 scale-75 sm:scale-100 origin-top-right">
-            <Crown3D className="w-12 h-12" />
+            <Icon3D variant="amber" size="lg">
+              <Crown size={24} />
+            </Icon3D>
           </div>
         </Card>
         <Card className="p-4 sm:p-5 flex items-center justify-between gap-2">
@@ -169,7 +172,7 @@ export function CustomersView({
             <div className="text-[11px] text-green-600 font-semibold mt-1">+4% MoM</div>
           </div>
           <div className="shrink-0 scale-75 sm:scale-100 origin-top-right">
-            <Icon3D variant="green" size="lg" animate="float">
+            <Icon3D variant="green" size="lg">
               <RotateCcw size={24} />
             </Icon3D>
           </div>
@@ -183,7 +186,7 @@ export function CustomersView({
             <div className="text-[11px] text-red-600 font-semibold mt-1">Perlu retensi</div>
           </div>
           <div className="shrink-0 scale-75 sm:scale-100 origin-top-right">
-            <Icon3D variant="red" size="lg" animate="float">
+            <Icon3D variant="red" size="lg">
               <Moon size={24} />
             </Icon3D>
           </div>
@@ -246,7 +249,7 @@ export function CustomersView({
             <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-primary-100/30 to-transparent rounded-full -translate-y-12 translate-x-12" />
             <div className="relative">
               <div className="flex items-start gap-3">
-                <Icon3D variant={tierVariant[c.tier]} size="lg" animate="float">
+                <Icon3D variant={tierVariant[c.tier]} size="lg">
                   {c.tier === "platinum" ? (
                     <Crown size={24} />
                   ) : c.tier === "gold" ? (
@@ -317,7 +320,7 @@ export function CustomersView({
 
       {filtered.length === 0 && (
         <Card className="mt-4 p-10 flex flex-col items-center text-center">
-          <Icon3D variant="purple" size="xl" animate="float">
+          <Icon3D variant="purple" size="xl">
             <UserIcon size={32} />
           </Icon3D>
           <h3 className="mt-4 font-semibold text-slate-900">Tidak ada customer</h3>

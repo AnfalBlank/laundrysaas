@@ -126,7 +126,7 @@ export function InventoryView({ initialInventory }: { initialInventory: Inventor
         <Card className="p-4 bg-gradient-to-br from-amber-50 to-orange-50 border-amber-200">
           <div className="flex flex-col sm:flex-row sm:items-center gap-3">
             <div className="flex items-start gap-3 flex-1 min-w-0">
-              <Icon3D variant="amber" size="md" animate="wiggle">
+              <Icon3D variant="amber" size="md">
                 <AlertTriangle size={20} />
               </Icon3D>
               <div className="flex-1 min-w-0">
@@ -189,7 +189,7 @@ export function InventoryView({ initialInventory }: { initialInventory: Inventor
               </div>
             </div>
             <div className="shrink-0 scale-75 sm:scale-100 origin-top-right">
-              <Icon3D variant={s.v} size="lg" animate="float">
+              <Icon3D variant={s.v} size="lg">
                 {s.icon}
               </Icon3D>
             </div>
@@ -235,7 +235,7 @@ export function InventoryView({ initialInventory }: { initialInventory: Inventor
                 )}
               >
                 <div className="flex items-start gap-3">
-                  <Icon3D variant={meta.variant} size="md" animate="float">
+                  <Icon3D variant={meta.variant} size="md">
                     {meta.icon}
                   </Icon3D>
                   <div className="flex-1 min-w-0">

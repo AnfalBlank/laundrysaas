@@ -429,7 +429,7 @@ export function OrdersView({
 
       {filtered.length === 0 && (
         <Card className="mt-4 p-10 flex flex-col items-center text-center">
-          <Icon3D variant="cyan" size="xl" animate="float">
+          <Icon3D variant="cyan" size="xl">
             <WashingMachine3D className="w-12 h-12" />
           </Icon3D>
           <h3 className="mt-4 font-semibold text-slate-900">Tidak ada order</h3>

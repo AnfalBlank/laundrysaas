@@ -92,7 +92,7 @@ export function ServicesView({ initialServices }: { initialServices: Service[] }
       <Card className="p-3 sm:p-4 flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
         <div className="flex items-center gap-2.5 min-w-0">
           <div className="shrink-0">
-            <Icon3D variant="cyan" size="md" animate="float">
+            <Icon3D variant="cyan" size="md">
               <Tag size={20} />
             </Icon3D>
           </div>
@@ -135,7 +135,7 @@ export function ServicesView({ initialServices }: { initialServices: Service[] }
         return (
           <div key={category} className="mt-5 sm:mt-6">
             <div className="flex items-center gap-2.5 mb-3">
-              <Icon3D variant={meta.variant} size="sm" animate="wiggle">
+              <Icon3D variant={meta.variant} size="sm">
                 {meta.icon}
               </Icon3D>
               <h2 className="font-bold text-slate-900">{meta.label}</h2>
@@ -150,7 +150,7 @@ export function ServicesView({ initialServices }: { initialServices: Service[] }
                   <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-primary-100/40 to-transparent rounded-full -translate-y-8 translate-x-8 group-hover:scale-150 transition-transform duration-500" />
                   <div className="relative">
                     <div className="flex items-start justify-between">
-                      <Icon3D variant={meta.variant} size="lg" animate="float">
+                      <Icon3D variant={meta.variant} size="lg">
                         {meta.icon}
                       </Icon3D>
                       <button

@@ -254,7 +254,7 @@ export function ReportsView({
             <div className="text-[11px] text-amber-600 font-semibold mt-1">Avg Order Value</div>
           </div>
           <div className="shrink-0 scale-75 sm:scale-100 origin-top-right">
-            <Icon3D variant="amber" size="lg" animate="float">
+            <Icon3D variant="amber" size="lg">
               <Diamond3D className="w-9 h-9" />
             </Icon3D>
           </div>

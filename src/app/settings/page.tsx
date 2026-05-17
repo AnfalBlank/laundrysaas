@@ -201,7 +201,7 @@ export default function SettingsPage() {
                     key={b.name}
                     className="flex items-center gap-3 p-3 rounded-xl border border-slate-200 hover:border-primary-200 hover:shadow-sm transition-all"
                   >
-                    <Icon3D variant={b.color} size="md" animate="float">
+                    <Icon3D variant={b.color} size="md">
                       <Building2 size={18} />
                     </Icon3D>
                     <div className="flex-1">

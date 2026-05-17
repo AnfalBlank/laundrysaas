@@ -58,7 +58,7 @@ export function StatCard({
           )}
         </div>
         <div className="shrink-0 scale-75 sm:scale-100 origin-top-right">
-          <Icon3D variant={variant} size="lg" animate="float">
+          <Icon3D variant={variant} size="lg">
             {icon}
           </Icon3D>
         </div>
