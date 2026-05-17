@@ -1,0 +1,247 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Icon3D } from "@/components/ui/icon3d";
+import { Crown3D, User3D } from "@/components/ui/laundry-icons";
+import { cn, formatCurrency, formatDate } from "@/lib/utils";
+import {
+  MessageCircle,
+  Plus,
+  Search,
+  Crown,
+  Star,
+  User as UserIcon,
+  RotateCcw,
+  Moon,
+} from "lucide-react";
+
+interface CustomerRow {
+  id: string;
+  name: string;
+  phone: string;
+  tier: string;
+  points: number;
+  totalOrders: number;
+  totalSpending: number;
+  createdAt: Date | null;
+}
+
+const tierColors: Record<string, string> = {
+  silver: "bg-slate-100 text-slate-700",
+  gold: "bg-amber-100 text-amber-700",
+  platinum: "bg-gradient-to-r from-purple-100 to-pink-100 text-purple-700",
+};
+
+const tierVariant: Record<string, Parameters<typeof Icon3D>[0]["variant"]> = {
+  silver: "indigo",
+  gold: "amber",
+  platinum: "purple",
+};
+
+const tierLabel = (t: string) =>
+  t.charAt(0).toUpperCase() + t.slice(1);
+
+export function CustomersView({
+  initialCustomers,
+  stats,
+}: {
+  initialCustomers: CustomerRow[];
+  stats: { total: number; vip: number };
+}) {
+  const [query, setQuery] = useState("");
+  const [tier, setTier] = useState<string>("ALL");
+
+  const filtered = useMemo(() => {
+    return initialCustomers.filter((c) => {
+      const matchesTier = tier === "ALL" || c.tier === tier.toLowerCase();
+      const q = query.toLowerCase();
+      const matchesQuery = !q || c.name.toLowerCase().includes(q) || c.phone.includes(q);
+      return matchesTier && matchesQuery;
+    });
+  }, [tier, query, initialCustomers]);
+
+  return (
+    <>
+      {/* Stats overview */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <Card className="p-4 sm:p-5 flex items-center justify-between gap-2">
+          <div className="min-w-0">
+            <div className="text-[10px] sm:text-xs text-slate-500 uppercase tracking-wide truncate">
+              Total Customer
+            </div>
+            <div className="text-xl sm:text-2xl font-bold text-slate-900 mt-1">
+              {stats.total}
+            </div>
+            <div className="text-[11px] text-green-600 font-semibold mt-1">+24 minggu ini</div>
+          </div>
+          <div className="shrink-0 scale-75 sm:scale-100 origin-top-right">
+            <User3D className="w-12 h-12" />
+          </div>
+        </Card>
+        <Card className="p-4 sm:p-5 flex items-center justify-between gap-2">
+          <div className="min-w-0">
+            <div className="text-[10px] sm:text-xs text-slate-500 uppercase tracking-wide truncate">
+              VIP / Platinum
+            </div>
+            <div className="text-xl sm:text-2xl font-bold text-slate-900 mt-1">{stats.vip}</div>
+            <div className="text-[11px] text-amber-600 font-semibold mt-1">
+              {stats.total > 0 ? ((stats.vip / stats.total) * 100).toFixed(1) : 0}% dari total
+            </div>
+          </div>
+          <div className="shrink-0 scale-75 sm:scale-100 origin-top-right">
+            <Crown3D className="w-12 h-12" />
+          </div>
+        </Card>
+        <Card className="p-4 sm:p-5 flex items-center justify-between gap-2">
+          <div className="min-w-0">
+            <div className="text-[10px] sm:text-xs text-slate-500 uppercase tracking-wide truncate">
+              Repeat Order
+            </div>
+            <div className="text-xl sm:text-2xl font-bold text-slate-900 mt-1">68%</div>
+            <div className="text-[11px] text-green-600 font-semibold mt-1">+4% MoM</div>
+          </div>
+          <div className="shrink-0 scale-75 sm:scale-100 origin-top-right">
+            <Icon3D variant="green" size="lg" animate="float">
+              <RotateCcw size={24} />
+            </Icon3D>
+          </div>
+        </Card>
+        <Card className="p-4 sm:p-5 flex items-center justify-between gap-2">
+          <div className="min-w-0">
+            <div className="text-[10px] sm:text-xs text-slate-500 uppercase tracking-wide truncate">
+              Inactive 30 hari
+            </div>
+            <div className="text-xl sm:text-2xl font-bold text-slate-900 mt-1">142</div>
+            <div className="text-[11px] text-red-600 font-semibold mt-1">Perlu retensi</div>
+          </div>
+          <div className="shrink-0 scale-75 sm:scale-100 origin-top-right">
+            <Icon3D variant="red" size="lg" animate="float">
+              <Moon size={24} />
+            </Icon3D>
+          </div>
+        </Card>
+      </div>
+
+      {/* Action bar */}
+      <Card className="mt-4 sm:mt-5 p-3 sm:p-4 flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
+        <div className="relative flex-1 sm:max-w-md">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Cari nama atau nomor HP..."
+            className="pl-9"
+          />
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap flex-1 sm:flex-none">
+            {["ALL", "Silver", "Gold", "Platinum"].map((t) => (
+              <button
+                key={t}
+                onClick={() => setTier(t)}
+                className={cn(
+                  "px-3 py-1.5 rounded-full text-xs font-semibold border transition-all",
+                  tier === t
+                    ? "bg-gradient-to-br from-primary-500 to-accent-500 text-white border-transparent shadow-md shadow-primary-500/30"
+                    : "bg-white text-slate-600 border-slate-200 hover:border-primary-200"
+                )}
+              >
+                {t === "ALL" ? "Semua" : t}
+              </button>
+            ))}
+          </div>
+          <Button className="shrink-0">
+            <Plus size={16} />
+            <span className="hidden sm:inline">Customer Baru</span>
+            <span className="sm:hidden">Baru</span>
+          </Button>
+        </div>
+      </Card>
+
+      {/* Customer grid */}
+      <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+        {filtered.map((c) => (
+          <Card
+            key={c.id}
+            className="tilt-card p-5 relative overflow-hidden hover:shadow-lg transition-shadow"
+          >
+            <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-primary-100/30 to-transparent rounded-full -translate-y-12 translate-x-12" />
+            <div className="relative">
+              <div className="flex items-start gap-3">
+                <Icon3D variant={tierVariant[c.tier]} size="lg" animate="float">
+                  {c.tier === "platinum" ? (
+                    <Crown size={24} />
+                  ) : c.tier === "gold" ? (
+                    <Star size={24} />
+                  ) : (
+                    <UserIcon size={24} />
+                  )}
+                </Icon3D>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-bold text-slate-900 truncate">{c.name}</h3>
+                  </div>
+                  <p className="text-xs text-slate-500">{c.phone}</p>
+                  <span
+                    className={cn(
+                      "inline-block mt-2 text-[11px] font-bold px-2 py-0.5 rounded-full",
+                      tierColors[c.tier]
+                    )}
+                  >
+                    {tierLabel(c.tier)} Member
+                  </span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2 mt-4 text-center">
+                <div className="rounded-xl bg-slate-50 p-2.5 min-w-0">
+                  <div className="text-[10px] text-slate-500 uppercase tracking-wide">Order</div>
+                  <div className="font-bold text-slate-900 text-base">{c.totalOrders}</div>
+                </div>
+                <div className="rounded-xl bg-slate-50 p-2.5 min-w-0">
+                  <div className="text-[10px] text-slate-500 uppercase tracking-wide">Spent</div>
+                  <div className="font-bold text-slate-900 text-[11px] truncate">
+                    {formatCurrency(c.totalSpending)}
+                  </div>
+                </div>
+                <div className="rounded-xl bg-slate-50 p-2.5 min-w-0">
+                  <div className="text-[10px] text-slate-500 uppercase tracking-wide">Poin</div>
+                  <div className="font-bold text-amber-600 text-base">{c.points}</div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 mt-4">
+                <Button variant="secondary" className="flex-1" size="sm">
+                  <MessageCircle size={14} /> Chat
+                </Button>
+                <Button className="flex-1" size="sm">
+                  Detail
+                </Button>
+              </div>
+              {c.createdAt && (
+                <p className="text-[11px] text-slate-400 mt-3">
+                  Bergabung sejak {formatDate(c.createdAt)}
+                </p>
+              )}
+            </div>
+          </Card>
+        ))}
+      </div>
+
+      {filtered.length === 0 && (
+        <Card className="mt-4 p-10 flex flex-col items-center text-center">
+          <Icon3D variant="purple" size="xl" animate="float">
+            <UserIcon size={32} />
+          </Icon3D>
+          <h3 className="mt-4 font-semibold text-slate-900">Tidak ada customer</h3>
+          <p className="text-sm text-slate-500 mt-1">
+            Tidak ada customer yang cocok dengan filter saat ini.
+          </p>
+        </Card>
+      )}
+    </>
+  );
+}
