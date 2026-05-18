@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Bell, Search, Menu, MessageCircle, User, LogOut, X, ArrowLeftRight } from "lucide-react";
+import { Bell, Search, Menu, MessageCircle, User, LogOut, X, ArrowLeftRight, Settings } from "lucide-react";
 import { Icon3D } from "@/components/ui/icon3d";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/toast";
@@ -61,7 +61,9 @@ export function Topbar({
     try {
       await fetch("/api/auth/switch", { method: "DELETE" });
       toast.success("Logout berhasil");
-      setTimeout(() => router.push("/login"), 500);
+      setTimeout(() => {
+        window.location.href = "/login";
+      }, 500);
     } catch {
       toast.error("Gagal logout");
     }
@@ -79,9 +81,10 @@ export function Topbar({
       toast.success(`Login sebagai ${name}`, ROLE_LABELS[role as keyof typeof ROLE_LABELS]);
       setShowSwitcher(false);
       setShowProfile(false);
-      // Navigate to dashboard and refresh
-      router.push("/");
-      router.refresh();
+      // Full page reload to re-fetch server components with new user
+      setTimeout(() => {
+        window.location.href = "/";
+      }, 300);
     } catch {
       toast.error("Gagal switch user");
     } finally {
@@ -314,18 +317,20 @@ export function Topbar({
               >
                 <ArrowLeftRight size={14} /> Switch User (Demo)
               </button>
-              {currentUser?.role === "owner" && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowProfile(false);
-                    router.push("/settings");
-                  }}
-                  className="w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
-                >
-                  Pengaturan Akun
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={() => {
+                  setShowProfile(false);
+                  if (currentUser?.role === "owner") {
+                    window.location.href = "/settings";
+                  } else {
+                    toast.info("Hubungi Owner untuk pengaturan akun");
+                  }
+                }}
+                className="w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors flex items-center gap-2"
+              >
+                <Settings size={14} /> Pengaturan Akun
+              </button>
               <button
                 type="button"
                 onClick={() => {

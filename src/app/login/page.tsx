@@ -15,6 +15,40 @@ import { useState } from "react";
 
 export default function LoginPage() {
   const [show, setShow] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setLoading(true);
+    setError("");
+
+    try {
+      // Demo login: find user by email and set cookie
+      const form = e.currentTarget;
+      const email = (form.elements.namedItem("email") as HTMLInputElement).value;
+
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        setError(data.error || "Login gagal");
+        setLoading(false);
+        return;
+      }
+
+      // Full page redirect to dashboard
+      window.location.href = "/";
+    } catch {
+      setError("Terjadi kesalahan, coba lagi");
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen grid lg:grid-cols-2 bg-gradient-to-br from-slate-50 via-blue-50/40 to-cyan-50/30 relative overflow-hidden">
       {/* Decorative bubbles */}
@@ -41,25 +75,34 @@ export default function LoginPage() {
             Masuk ke dashboard untuk mengelola laundry Anda
           </p>
 
-          <form className="mt-8 space-y-4">
+          {error && (
+            <div className="mt-4 p-3 rounded-xl bg-red-50 border border-red-200 text-sm text-red-700">
+              {error}
+            </div>
+          )}
+
+          <form onSubmit={handleLogin} className="mt-8 space-y-4">
             <div>
               <label className="text-sm font-semibold text-slate-700">Email</label>
               <Input
+                name="email"
                 type="email"
                 placeholder="email@laundryhub.id"
                 defaultValue="owner@laundrysukses.id"
                 className="mt-1.5 h-11"
+                required
               />
             </div>
             <div>
               <div className="flex items-center justify-between">
                 <label className="text-sm font-semibold text-slate-700">Password</label>
-                <Link href="#" className="text-xs font-semibold text-primary-600 hover:text-primary-700">
+                <button type="button" className="text-xs font-semibold text-primary-600 hover:text-primary-700">
                   Lupa?
-                </Link>
+                </button>
               </div>
               <div className="relative mt-1.5">
                 <Input
+                  name="password"
                   type={show ? "text" : "password"}
                   placeholder="••••••••"
                   defaultValue="password"
@@ -80,11 +123,9 @@ export default function LoginPage() {
               Ingat saya selama 30 hari
             </label>
 
-            <Link href="/" className="block">
-              <Button size="lg" className="w-full">
-                Masuk Sekarang
-              </Button>
-            </Link>
+            <Button type="submit" size="lg" className="w-full" disabled={loading}>
+              {loading ? "Memproses..." : "Masuk Sekarang"}
+            </Button>
           </form>
 
           <div className="my-6 flex items-center gap-3 text-xs text-slate-400">
