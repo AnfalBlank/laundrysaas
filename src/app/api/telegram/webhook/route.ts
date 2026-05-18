@@ -74,10 +74,10 @@ export async function GET() {
 }
 
 /**
- * Simple AI-like auto-reply based on keywords.
+ * Smart auto-reply based on intent detection.
  */
 function generateReply(text: string, name: string, businessName: string): string {
-  const lower = text.toLowerCase();
+  const lower = text.toLowerCase().trim();
 
   // /start command
   if (lower === "/start") {
@@ -86,16 +86,29 @@ function generateReply(text: string, name: string, businessName: string): string
       `Selamat datang di <b>${businessName}</b>.\n\n` +
       `Saya bot otomatis yang siap membantu:\n` +
       `• Cek harga layanan → ketik <b>harga</b>\n` +
-      `• Cek status order → ketik <b>status [nomor invoice]</b>\n` +
+      `• Cek status order → ketik <b>cek status</b>\n` +
       `• Mau pickup → ketik <b>pickup</b>\n` +
-      `• Jam operasional → ketik <b>jam</b>\n` +
+      `• Jam operasional → ketik <b>jam buka</b>\n` +
       `• Bicara dengan admin → ketik <b>admin</b>\n\n` +
-      `Silakan ketik pesan Anda 😊`
+      `Atau langsung ceritakan kebutuhan Anda 😊`
+    );
+  }
+
+  // /help command
+  if (lower === "/help" || lower === "help" || lower === "menu") {
+    return (
+      `📋 <b>Menu Bantuan</b>\n\n` +
+      `• <b>harga</b> — daftar harga layanan\n` +
+      `• <b>pickup</b> atau <b>jemput</b> — request pickup\n` +
+      `• <b>cek status</b> — cek status order\n` +
+      `• <b>jam buka</b> — jam operasional\n` +
+      `• <b>admin</b> — bicara dengan admin\n\n` +
+      `Atau ketik pesan bebas, saya coba bantu 😊`
     );
   }
 
   // Price inquiry
-  if (lower.includes("harga") || lower.includes("price") || lower.includes("tarif")) {
+  if (lower.includes("harga") || lower.includes("price") || lower.includes("tarif") || lower.includes("berapa")) {
     return (
       `💰 <b>Daftar Harga ${businessName}</b>\n\n` +
       `• Cuci Setrika — Rp 7.000/kg\n` +
@@ -110,7 +123,7 @@ function generateReply(text: string, name: string, businessName: string): string
   }
 
   // Status check
-  if (lower.includes("status") || lower.includes("cek") || lower.includes("inv-")) {
+  if (lower.includes("status") || lower.includes("cek order") || lower.includes("inv-") || lower.includes("invoice")) {
     return (
       `📋 Untuk cek status order, silakan kirim nomor invoice Anda.\n` +
       `Format: <b>INV-YYYYMMDD-XXX</b>\n\n` +
@@ -118,8 +131,9 @@ function generateReply(text: string, name: string, businessName: string): string
     );
   }
 
-  // Pickup request
-  if (lower.includes("pickup") || lower.includes("jemput") || lower.includes("ambil")) {
+  // Pickup request — detect intent to schedule pickup
+  if (lower.includes("pickup") || lower.includes("jemput") || lower.includes("ambil laundry") ||
+      lower.includes("mau cuci") || lower.includes("mau laundry")) {
     return (
       `🛵 <b>Request Pickup</b>\n\n` +
       `Untuk dijemput, mohon kirim info:\n` +
@@ -132,8 +146,10 @@ function generateReply(text: string, name: string, businessName: string): string
     );
   }
 
-  // Operating hours
-  if (lower.includes("jam") || lower.includes("buka") || lower.includes("tutup") || lower.includes("operasional")) {
+  // Operating hours — only trigger on explicit "jam buka/tutup/operasional" NOT just "jam"
+  if (lower.includes("jam buka") || lower.includes("jam tutup") || lower.includes("jam operasional") ||
+      lower.includes("buka jam") || lower.includes("kapan buka") || lower.includes("kapan tutup") ||
+      (lower.includes("jam") && lower.includes("operasional"))) {
     return (
       `🕐 <b>Jam Operasional ${businessName}</b>\n\n` +
       `Senin - Sabtu: 07:00 - 21:00\n` +
@@ -143,7 +159,8 @@ function generateReply(text: string, name: string, businessName: string): string
   }
 
   // Talk to admin
-  if (lower.includes("admin") || lower.includes("manusia") || lower.includes("cs") || lower.includes("help")) {
+  if (lower.includes("admin") || lower.includes("manusia") || lower.includes("cs") ||
+      lower === "help" || lower.includes("komplain") || lower.includes("masalah")) {
     return (
       `👤 Baik, saya akan hubungkan Anda dengan admin.\n\n` +
       `Mohon tunggu sebentar, admin kami akan membalas dalam beberapa menit.\n\n` +
@@ -152,18 +169,49 @@ function generateReply(text: string, name: string, businessName: string): string
   }
 
   // Thank you
-  if (lower.includes("terima kasih") || lower.includes("thanks") || lower.includes("makasih")) {
+  if (lower.includes("terima kasih") || lower.includes("thanks") || lower.includes("makasih") || lower.includes("thx")) {
     return `Sama-sama ${name}! 😊 Ada yang bisa dibantu lagi?`;
   }
 
-  // Default response
+  // Greeting
+  if (lower === "hi" || lower === "halo" || lower === "hai" || lower === "hello" || lower === "hey") {
+    return (
+      `Halo ${name}! 😊 Ada yang bisa saya bantu?\n\n` +
+      `Ketik <b>menu</b> untuk lihat daftar perintah.`
+    );
+  }
+
+  // Looks like an address/pickup detail (contains street indicators + time)
+  if ((lower.includes("jl") || lower.includes("jalan") || lower.includes("blok") || lower.includes("rt")) &&
+      (lower.includes("jam") || lower.includes("pagi") || lower.includes("sore") || lower.includes("siang"))) {
+    return (
+      `✅ <b>Pickup Request Diterima!</b>\n\n` +
+      `Detail:\n${text}\n\n` +
+      `Admin kami akan konfirmasi dan assign driver dalam 5-10 menit.\n` +
+      `Anda akan mendapat notifikasi saat driver berangkat. 🛵\n\n` +
+      `Terima kasih sudah menggunakan ${businessName}!`
+    );
+  }
+
+  // Contains time reference (likely a pickup schedule)
+  if ((lower.includes("jam") || lower.includes("pagi") || lower.includes("sore") || lower.includes("siang") || lower.includes("malam")) &&
+      (lower.includes("kg") || lower.includes("kilo") || lower.includes("baju") || lower.includes("celana"))) {
+    return (
+      `✅ Noted! Saya catat request Anda:\n<i>${text}</i>\n\n` +
+      `Untuk proses pickup, mohon lengkapi dengan <b>alamat</b> Anda.\n` +
+      `Contoh: Jl. Sudirman 12, Blok A`
+    );
+  }
+
+  // Default — friendly fallback
   return (
     `Halo ${name}! Terima kasih sudah menghubungi <b>${businessName}</b>.\n\n` +
-    `Saya belum mengerti pesan Anda. Coba ketik:\n` +
+    `Saya belum yakin maksud pesan Anda. Coba ketik salah satu:\n` +
     `• <b>harga</b> — lihat daftar harga\n` +
     `• <b>pickup</b> — request jemput\n` +
-    `• <b>status</b> — cek order\n` +
-    `• <b>jam</b> — jam operasional\n` +
-    `• <b>admin</b> — bicara dengan admin`
+    `• <b>cek status</b> — cek order\n` +
+    `• <b>jam buka</b> — jam operasional\n` +
+    `• <b>admin</b> — bicara dengan admin\n\n` +
+    `Atau ceritakan kebutuhan Anda secara lengkap (alamat, jam, berat) dan saya akan bantu proses 😊`
   );
 }
