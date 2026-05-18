@@ -329,13 +329,57 @@ export function SettingsView({ initialTenant }: { initialTenant: InitialTenant }
                     onChange={(v) => setForm({ ...form, telegramBotUsername: v })}
                     placeholder="@YourLaundryBot"
                   />
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      onClick={async () => {
+                        try {
+                          const res = await fetch("/api/telegram/setup", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) });
+                          const data = await res.json();
+                          if (data.success) {
+                            toast.success("Webhook Telegram aktif!", data.webhookUrl);
+                          } else {
+                            toast.error("Gagal setup webhook", data.error || "Unknown error");
+                          }
+                        } catch {
+                          toast.error("Gagal menghubungi server");
+                        }
+                      }}
+                    >
+                      <Plug size={14} /> Aktifkan Webhook
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={async () => {
+                        try {
+                          const res = await fetch("/api/telegram/setup");
+                          const data = await res.json();
+                          if (data.webhookInfo?.url) {
+                            toast.success("Webhook aktif", data.webhookInfo.url);
+                          } else {
+                            toast.info("Webhook belum di-setup", "Klik 'Aktifkan Webhook' setelah simpan token");
+                          }
+                        } catch {
+                          toast.error("Gagal cek status");
+                        }
+                      }}
+                    >
+                      Cek Status
+                    </Button>
+                  </div>
                   <div className="text-xs text-slate-500 bg-white rounded-lg p-3 border border-blue-100">
                     <strong>Cara setup:</strong>
                     <ol className="mt-1 space-y-1 list-decimal list-inside">
                       <li>Buka @BotFather di Telegram</li>
                       <li>Kirim /newbot → ikuti instruksi</li>
                       <li>Copy token yang diberikan → paste di atas</li>
-                      <li>Customer chat ke bot Anda untuk order</li>
+                      <li>Klik <b>Simpan Channel</b> dulu</li>
+                      <li>Lalu klik <b>Aktifkan Webhook</b></li>
+                      <li>Customer chat ke bot Anda → bot auto-reply</li>
                     </ol>
                   </div>
                 </div>
