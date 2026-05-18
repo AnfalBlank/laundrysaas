@@ -1,14 +1,30 @@
 import { AppShell } from "@/components/layout/app-shell";
 import { WhatsappView } from "@/components/whatsapp/whatsapp-view";
 import { listWhatsappTemplates } from "@/db/repositories";
+import { db } from "@/db/client";
+import { tenants } from "@/db/schema";
+import { eq } from "drizzle-orm";
+import { getCurrentTenantId } from "@/lib/tenant";
 
 export const dynamic = "force-dynamic";
 
 export default async function WhatsAppPage() {
+  const tenantId = getCurrentTenantId();
+  const [tenant] = await db
+    .select({ messagingChannel: tenants.messagingChannel })
+    .from(tenants)
+    .where(eq(tenants.id, tenantId))
+    .limit(1);
+
+  const channel = tenant?.messagingChannel ?? "whatsapp";
   const templates = await listWhatsappTemplates();
+
+  const title = channel === "telegram" ? "Telegram Automation" : "WhatsApp Automation";
+  const subtitle = "AI-powered customer service & broadcast";
+
   return (
-    <AppShell title="WhatsApp Automation" subtitle="AI-powered customer service & broadcast">
-      <WhatsappView templates={templates} />
+    <AppShell title={title} subtitle={subtitle}>
+      <WhatsappView templates={templates} channel={channel} />
     </AppShell>
   );
 }

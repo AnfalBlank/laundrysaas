@@ -24,6 +24,16 @@ export const tenants = sqliteTable("tenants", {
   planExpiresAt: integer("plan_expires_at", { mode: "timestamp" }),
   logoUrl: text("logo_url"),
   primaryColor: text("primary_color").default("#2563eb"),
+  // Messaging channel preference
+  messagingChannel: text("messaging_channel", {
+    enum: ["whatsapp", "telegram"],
+  })
+    .notNull()
+    .default("whatsapp"),
+  whatsappNumber: text("whatsapp_number"),
+  whatsappToken: text("whatsapp_token"),
+  telegramBotToken: text("telegram_bot_token"),
+  telegramBotUsername: text("telegram_bot_username"),
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
     .default(sql`(unixepoch())`),

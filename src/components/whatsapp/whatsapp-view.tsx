@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Icon3D } from "@/components/ui/icon3d";
-import { Sparkles3D, Whatsapp3D } from "@/components/ui/laundry-icons";
+import { Telegram3D, Whatsapp3D, Sparkles3D } from "@/components/ui/laundry-icons";
 import { chats } from "@/lib/dummy-data";
 import { cn } from "@/lib/utils";
 import {
@@ -62,9 +62,13 @@ const messages = [
   },
 ];
 
-export function WhatsappView({ templates }: { templates: Template[] }) {
+export function WhatsappView({ templates, channel = "whatsapp" }: { templates: Template[]; channel?: string }) {
   const [activeChat, setActiveChat] = useState(chats[0].id);
   const [message, setMessage] = useState("");
+
+  const isWhatsApp = channel === "whatsapp";
+  const channelLabel = isWhatsApp ? "WhatsApp" : "Telegram";
+  const channelColor = isWhatsApp ? "from-green-400 to-emerald-600" : "from-blue-400 to-blue-600";
 
   return (
     <>
@@ -72,18 +76,26 @@ export function WhatsappView({ templates }: { templates: Template[] }) {
       <Card className="p-4 flex flex-col md:flex-row md:items-center gap-3 sm:gap-4">
         <div className="flex items-center gap-3 flex-1 min-w-0">
           <div className="shrink-0">
-            <Whatsapp3D className="w-12 h-12" />
+            {isWhatsApp ? (
+              <Whatsapp3D className="w-12 h-12" />
+            ) : (
+              <Telegram3D className="w-12 h-12" />
+            )}
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <h3 className="font-bold text-slate-900">WhatsApp Business</h3>
+              <h3 className="font-bold text-slate-900">
+                {isWhatsApp ? "WhatsApp Business" : "Telegram Bot"}
+              </h3>
               <Badge variant="success">
                 <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" />
                 Connected
               </Badge>
             </div>
             <p className="text-xs text-slate-500 truncate">
-              Fonnte · +62 812-1234-5678 · Online 14 hari
+              {isWhatsApp
+                ? "Fonnte · +62 812-1234-5678 · Online 14 hari"
+                : "Telegram Bot API · @YourLaundryBot · Online"}
             </p>
           </div>
         </div>
@@ -139,7 +151,7 @@ export function WhatsappView({ templates }: { templates: Template[] }) {
           <div className="min-w-0">
             <CardTitle>Template Notifikasi Otomatis</CardTitle>
             <p className="text-xs text-slate-500 mt-0.5">
-              Auto-trigger pesan untuk setiap status order
+              Auto-trigger pesan {channelLabel} untuk setiap status order
             </p>
           </div>
           <Button variant="secondary" size="sm" className="shrink-0">
@@ -196,7 +208,7 @@ export function WhatsappView({ templates }: { templates: Template[] }) {
           <CardHeader>
             <CardTitle>Inbox Customer</CardTitle>
             <p className="text-xs text-slate-500 mt-0.5">
-              {chats.filter((c) => c.unread > 0).length} percakapan baru
+              {chats.filter((c) => c.unread > 0).length} percakapan baru via {channelLabel}
             </p>
           </CardHeader>
           <div className="divide-y divide-slate-100 max-h-[420px] overflow-y-auto">
@@ -269,7 +281,12 @@ export function WhatsappView({ templates }: { templates: Template[] }) {
                     "max-w-[80%] sm:max-w-[75%] rounded-2xl px-3.5 py-2 text-sm",
                     m.fromCustomer
                       ? "bg-white border border-slate-200 text-slate-800 rounded-bl-sm"
-                      : "bg-gradient-to-br from-green-500 to-emerald-600 text-white rounded-br-sm shadow-md shadow-green-500/20"
+                      : cn(
+                          "text-white rounded-br-sm shadow-md",
+                          isWhatsApp
+                            ? "bg-gradient-to-br from-green-500 to-emerald-600 shadow-green-500/20"
+                            : "bg-gradient-to-br from-blue-500 to-blue-600 shadow-blue-500/20"
+                        )
                   )}
                 >
                   {m.isBot && (

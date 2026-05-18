@@ -24,6 +24,11 @@ export default async function SettingsPage() {
           customDomain: tenant?.customDomain ?? "",
           logoUrl: tenant?.logoUrl ?? "",
           primaryColor: tenant?.primaryColor ?? "#2563eb",
+          messagingChannel: tenant?.messagingChannel ?? "whatsapp",
+          whatsappNumber: tenant?.whatsappNumber ?? "",
+          whatsappToken: tenant?.whatsappToken ?? "",
+          telegramBotToken: tenant?.telegramBotToken ?? "",
+          telegramBotUsername: tenant?.telegramBotUsername ?? "",
         }}
       />
     </AppShell>

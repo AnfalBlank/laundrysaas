@@ -209,6 +209,24 @@ export function Whatsapp3D({ className }: Props) {
   );
 }
 
+export function Telegram3D({ className }: Props) {
+  return (
+    <svg viewBox="0 0 64 64" className={cn(base, className ?? "w-10 h-10")}>
+      <defs>
+        <radialGradient id="tg-bg" cx="0.3" cy="0.3" r="0.8">
+          <stop offset="0%" stopColor="#93c5fd" />
+          <stop offset="100%" stopColor="#2563eb" />
+        </radialGradient>
+      </defs>
+      <circle cx="32" cy="32" r="26" fill="url(#tg-bg)" stroke="#1d4ed8" strokeWidth="1.4" />
+      <path
+        d="M16 30 L44 20 C45 19.5 46 20 45.5 21.5 L40 44 C39.8 45 39 45.3 38.2 44.8 L30 39 L26 43 C25.5 43.5 25 43.3 25 42.5 L25.5 37 L39 24.5 C39.5 24 39 23.8 38.3 24.2 L22 35 L16 33 C15 32.7 15 32 16 30 Z"
+        fill="#fff"
+      />
+    </svg>
+  );
+}
+
 export function Sparkles3D({ className }: Props) {
   return (
     <svg viewBox="0 0 64 64" className={cn(base, className ?? "w-10 h-10")}>

@@ -10,6 +10,7 @@ export interface TenantInfo {
   branchCount: number;
   primaryColor: string;
   logoUrl: string | null;
+  messagingChannel: "whatsapp" | "telegram";
 }
 
 export interface SimpleUser {

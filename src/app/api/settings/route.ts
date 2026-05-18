@@ -36,6 +36,11 @@ export async function PATCH(req: Request) {
     if (body.customDomain !== undefined) allowed.customDomain = body.customDomain;
     if (body.logoUrl !== undefined) allowed.logoUrl = body.logoUrl;
     if (body.primaryColor !== undefined) allowed.primaryColor = body.primaryColor;
+    if (body.messagingChannel !== undefined) allowed.messagingChannel = body.messagingChannel;
+    if (body.whatsappNumber !== undefined) allowed.whatsappNumber = body.whatsappNumber;
+    if (body.whatsappToken !== undefined) allowed.whatsappToken = body.whatsappToken;
+    if (body.telegramBotToken !== undefined) allowed.telegramBotToken = body.telegramBotToken;
+    if (body.telegramBotUsername !== undefined) allowed.telegramBotUsername = body.telegramBotUsername;
 
     if (Object.keys(allowed).length === 0) {
       return NextResponse.json({ error: "No valid fields to update" }, { status: 400 });

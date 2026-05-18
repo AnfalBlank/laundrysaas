@@ -143,6 +143,7 @@ interface SidebarProps {
   tenant?: {
     name: string;
     branchCount: number;
+    messagingChannel?: "whatsapp" | "telegram";
   };
   currentUser?: AuthUser | null;
 }
@@ -150,9 +151,20 @@ interface SidebarProps {
 export function Sidebar({ open, onClose, tenant, currentUser }: SidebarProps) {
   const pathname = usePathname();
   const role = (currentUser?.role ?? "owner") as Role;
+  const channel = tenant?.messagingChannel ?? "whatsapp";
 
-  // Filter menu by role
-  const navItems = allNavItems.filter((item) => item.roles.includes(role));
+  // Filter menu by role and adapt messaging label
+  const navItems = allNavItems
+    .filter((item) => item.roles.includes(role))
+    .map((item) => {
+      if (item.href === "/whatsapp") {
+        return {
+          ...item,
+          label: channel === "telegram" ? "Telegram" : "WhatsApp",
+        };
+      }
+      return item;
+    });
 
   useEffect(() => {
     const isMobile = window.matchMedia("(max-width: 1023px)").matches;

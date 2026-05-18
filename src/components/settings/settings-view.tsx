@@ -23,11 +23,13 @@ import {
   Cloud,
   Bot,
   Loader2,
+  Send,
 } from "lucide-react";
 
 const tabs = [
   { id: "business", label: "Profil Bisnis", icon: <Building2 size={16} />, variant: "blue" as const },
   { id: "branches", label: "Cabang", icon: <Globe size={16} />, variant: "cyan" as const },
+  { id: "messaging", label: "Messaging", icon: <MessageCircleMore size={16} />, variant: "green" as const },
   { id: "appearance", label: "Branding", icon: <Palette size={16} />, variant: "pink" as const },
   { id: "integration", label: "Integrasi", icon: <Plug size={16} />, variant: "purple" as const },
   { id: "billing", label: "Subscription", icon: <Receipt size={16} />, variant: "amber" as const },
@@ -49,6 +51,11 @@ interface InitialTenant {
   customDomain: string;
   logoUrl: string;
   primaryColor: string;
+  messagingChannel: string;
+  whatsappNumber: string;
+  whatsappToken: string;
+  telegramBotToken: string;
+  telegramBotUsername: string;
 }
 
 export function SettingsView({ initialTenant }: { initialTenant: InitialTenant }) {
@@ -215,6 +222,143 @@ export function SettingsView({ initialTenant }: { initialTenant: InitialTenant }
               </p>
             </CardHeader>
             <BranchesManager />
+          </Card>
+        )}
+
+        {active === "messaging" && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Channel Messaging</CardTitle>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Pilih channel utama untuk notifikasi otomatis &amp; customer service.
+                Semua automation akan menggunakan channel yang dipilih.
+              </p>
+            </CardHeader>
+            <div className="p-4 sm:p-5 space-y-5">
+              {/* Channel selector */}
+              <div>
+                <label className="text-sm font-semibold text-slate-700">Channel Aktif</label>
+                <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setForm({ ...form, messagingChannel: "whatsapp" })}
+                    className={cn(
+                      "rounded-2xl border-2 p-4 text-left transition-all",
+                      form.messagingChannel === "whatsapp"
+                        ? "border-green-500 bg-green-50 shadow-md"
+                        : "border-slate-200 hover:border-slate-300"
+                    )}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center text-white">
+                        <MessageCircleMore size={20} />
+                      </div>
+                      <div>
+                        <div className="font-bold text-slate-900">WhatsApp</div>
+                        <div className="text-xs text-slate-500">via Fonnte / WAHA</div>
+                      </div>
+                    </div>
+                    {form.messagingChannel === "whatsapp" && (
+                      <Badge variant="success" className="mt-2">Aktif</Badge>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setForm({ ...form, messagingChannel: "telegram" })}
+                    className={cn(
+                      "rounded-2xl border-2 p-4 text-left transition-all",
+                      form.messagingChannel === "telegram"
+                        ? "border-blue-500 bg-blue-50 shadow-md"
+                        : "border-slate-200 hover:border-slate-300"
+                    )}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white">
+                        <Send size={20} />
+                      </div>
+                      <div>
+                        <div className="font-bold text-slate-900">Telegram</div>
+                        <div className="text-xs text-slate-500">via Telegram Bot API</div>
+                      </div>
+                    </div>
+                    {form.messagingChannel === "telegram" && (
+                      <Badge variant="primary" className="mt-2">Aktif</Badge>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* WhatsApp config */}
+              {form.messagingChannel === "whatsapp" && (
+                <div className="space-y-3 rounded-xl border border-green-200 bg-green-50/50 p-4">
+                  <h4 className="font-semibold text-sm text-slate-900 flex items-center gap-2">
+                    <MessageCircleMore size={16} className="text-green-600" />
+                    Konfigurasi WhatsApp
+                  </h4>
+                  <FieldInput
+                    label="Nomor WhatsApp"
+                    value={form.whatsappNumber}
+                    onChange={(v) => setForm({ ...form, whatsappNumber: v })}
+                    placeholder="+62 812-xxxx-xxxx"
+                  />
+                  <FieldInput
+                    label="API Token (Fonnte)"
+                    value={form.whatsappToken}
+                    onChange={(v) => setForm({ ...form, whatsappToken: v })}
+                    placeholder="Token dari dashboard Fonnte"
+                  />
+                </div>
+              )}
+
+              {/* Telegram config */}
+              {form.messagingChannel === "telegram" && (
+                <div className="space-y-3 rounded-xl border border-blue-200 bg-blue-50/50 p-4">
+                  <h4 className="font-semibold text-sm text-slate-900 flex items-center gap-2">
+                    <Send size={16} className="text-blue-600" />
+                    Konfigurasi Telegram
+                  </h4>
+                  <FieldInput
+                    label="Bot Token"
+                    value={form.telegramBotToken}
+                    onChange={(v) => setForm({ ...form, telegramBotToken: v })}
+                    placeholder="123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11"
+                  />
+                  <FieldInput
+                    label="Bot Username"
+                    value={form.telegramBotUsername}
+                    onChange={(v) => setForm({ ...form, telegramBotUsername: v })}
+                    placeholder="@YourLaundryBot"
+                  />
+                  <div className="text-xs text-slate-500 bg-white rounded-lg p-3 border border-blue-100">
+                    <strong>Cara setup:</strong>
+                    <ol className="mt-1 space-y-1 list-decimal list-inside">
+                      <li>Buka @BotFather di Telegram</li>
+                      <li>Kirim /newbot → ikuti instruksi</li>
+                      <li>Copy token yang diberikan → paste di atas</li>
+                      <li>Customer chat ke bot Anda untuk order</li>
+                    </ol>
+                  </div>
+                </div>
+              )}
+
+              {/* Info */}
+              <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 text-xs text-amber-800">
+                <strong>Catatan:</strong> Mengganti channel akan mengalihkan semua notifikasi otomatis
+                (order diterima, pickup driver, laundry selesai, dll) ke channel yang dipilih.
+                Template pesan tetap sama, hanya delivery channel yang berubah.
+              </div>
+            </div>
+            <div className="px-4 sm:px-5 pb-5 flex flex-col sm:flex-row sm:justify-end gap-2">
+              <Button type="button" onClick={handleSave} disabled={saving}>
+                {saving ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin" /> Menyimpan...
+                  </>
+                ) : (
+                  "Simpan Channel"
+                )}
+              </Button>
+            </div>
           </Card>
         )}
 

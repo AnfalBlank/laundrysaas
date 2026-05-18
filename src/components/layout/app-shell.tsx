@@ -25,6 +25,7 @@ async function getTenantInfo() {
       branchCount: Number(count ?? 0),
       primaryColor: tenant?.primaryColor ?? "#2563eb",
       logoUrl: tenant?.logoUrl ?? null,
+      messagingChannel: (tenant?.messagingChannel ?? "whatsapp") as "whatsapp" | "telegram",
     };
   } catch {
     return {
@@ -32,6 +33,7 @@ async function getTenantInfo() {
       branchCount: 0,
       primaryColor: "#2563eb",
       logoUrl: null,
+      messagingChannel: "whatsapp" as const,
     };
   }
 }
