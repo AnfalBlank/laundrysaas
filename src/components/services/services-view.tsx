@@ -12,7 +12,7 @@ import { Icon3D } from "@/components/ui/icon3d";
 import { WashingMachine3D, Bolt3D, Sparkles3D } from "@/components/ui/laundry-icons";
 import { useToast } from "@/components/ui/toast";
 import { formatCurrency } from "@/lib/utils";
-import { Plus, Edit2, Tag } from "lucide-react";
+import { Plus, Edit2, Tag, Trash2 } from "lucide-react";
 import type { Service } from "@/db/schema";
 
 const serviceMeta: Record<
@@ -38,25 +38,49 @@ const pricingTypeLabel: Record<string, string> = {
   per_unit: "Per Unit",
 };
 
+const emptyForm = {
+  name: "",
+  category: "regular" as "regular" | "express" | "special",
+  pricingType: "per_kg" as "per_kg" | "per_item" | "per_unit",
+  price: 0,
+  durationDays: 2,
+};
+
 export function ServicesView({ initialServices }: { initialServices: Service[] }) {
   const router = useRouter();
   const toast = useToast();
-  const [showCreate, setShowCreate] = useState(false);
+  const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing] = useState<Service | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [form, setForm] = useState({
-    name: "",
-    category: "regular" as "regular" | "express" | "special",
-    pricingType: "per_kg" as "per_kg" | "per_item" | "per_unit",
-    price: 0,
-    durationDays: 2,
-  });
+  const [form, setForm] = useState(emptyForm);
 
-  const grouped = initialServices.reduce<Record<string, typeof initialServices>>((acc, s) => {
-    (acc[s.category] ??= []).push(s);
-    return acc;
-  }, {});
+  const grouped = initialServices.reduce<Record<string, typeof initialServices>>(
+    (acc, s) => {
+      (acc[s.category] ??= []).push(s);
+      return acc;
+    },
+    {}
+  );
 
-  const handleCreate = async (e: React.FormEvent) => {
+  const openCreate = () => {
+    setEditing(null);
+    setForm(emptyForm);
+    setShowForm(true);
+  };
+
+  const openEdit = (s: Service) => {
+    setEditing(s);
+    setForm({
+      name: s.name,
+      category: s.category as typeof form.category,
+      pricingType: s.pricingType as typeof form.pricingType,
+      price: s.price,
+      durationDays: s.durationDays,
+    });
+    setShowForm(true);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.name.trim() || !form.price) {
       toast.error("Lengkapi data", "Nama dan harga wajib");
@@ -64,26 +88,37 @@ export function ServicesView({ initialServices }: { initialServices: Service[] }
     }
     setSubmitting(true);
     try {
-      const res = await fetch("/api/services", {
-        method: "POST",
+      const url = editing ? `/api/services/${editing.id}` : "/api/services";
+      const method = editing ? "PATCH" : "POST";
+      const res = await fetch(url, {
+        method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
       });
       if (!res.ok) throw new Error("Failed");
-      toast.success("Layanan ditambahkan", form.name);
-      setShowCreate(false);
-      setForm({
-        name: "",
-        category: "regular",
-        pricingType: "per_kg",
-        price: 0,
-        durationDays: 2,
-      });
+      toast.success(
+        editing ? "Layanan ter-update" : "Layanan ditambahkan",
+        form.name
+      );
+      setShowForm(false);
+      setEditing(null);
       router.refresh();
     } catch (err) {
-      toast.error("Gagal menambah", String(err));
+      toast.error("Gagal menyimpan", String(err));
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleDelete = async (s: Service) => {
+    if (!confirm(`Nonaktifkan layanan "${s.name}"?`)) return;
+    try {
+      const res = await fetch(`/api/services/${s.id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed");
+      toast.success("Layanan dinonaktifkan", s.name);
+      router.refresh();
+    } catch (err) {
+      toast.error("Gagal", String(err));
     }
   };
 
@@ -107,16 +142,8 @@ export function ServicesView({ initialServices }: { initialServices: Service[] }
         </div>
         <div className="flex items-center gap-2">
           <Button
-            variant="secondary"
             className="flex-1 sm:flex-none"
-            type="button"
-            onClick={() => toast.info("Promo Harga", "Fitur akan segera tersedia")}
-          >
-            Promo Harga
-          </Button>
-          <Button
-            className="flex-1 sm:flex-none"
-            onClick={() => setShowCreate(true)}
+            onClick={openCreate}
             type="button"
           >
             <Plus size={16} />
@@ -147,22 +174,30 @@ export function ServicesView({ initialServices }: { initialServices: Service[] }
                   key={s.id}
                   className="tilt-card p-5 hover:shadow-lg transition-shadow relative overflow-hidden group"
                 >
-                  <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-primary-100/40 to-transparent rounded-full -translate-y-8 translate-x-8 group-hover:scale-150 transition-transform duration-500" />
+                  <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-primary-100/40 to-transparent rounded-full -translate-y-8 translate-x-8" />
                   <div className="relative">
                     <div className="flex items-start justify-between">
                       <Icon3D variant={meta.variant} size="lg">
                         {meta.icon}
                       </Icon3D>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          toast.info("Edit Layanan", "Fitur akan segera tersedia")
-                        }
-                        className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-slate-400 hover:text-primary-600 hover:bg-primary-50"
-                        aria-label="Edit"
-                      >
-                        <Edit2 size={14} />
-                      </button>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => openEdit(s)}
+                          className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-slate-400 hover:text-primary-600 hover:bg-primary-50"
+                          title="Edit"
+                        >
+                          <Edit2 size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(s)}
+                          className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50"
+                          title="Hapus"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
                     </div>
                     <h3 className="font-bold text-slate-900 mt-4">{s.name}</h3>
                     <div className="flex items-center gap-2 mt-1">
@@ -188,40 +223,41 @@ export function ServicesView({ initialServices }: { initialServices: Service[] }
         );
       })}
 
-      {/* Create Modal */}
+      {/* Form Modal (create + edit) */}
       <Modal
-        open={showCreate}
-        onClose={() => setShowCreate(false)}
-        title="Layanan Baru"
+        open={showForm}
+        onClose={() => setShowForm(false)}
+        title={editing ? `Edit Layanan: ${editing.name}` : "Layanan Baru"}
         size="md"
         footer={
           <>
             <Button
               variant="secondary"
-              onClick={() => setShowCreate(false)}
+              onClick={() => setShowForm(false)}
               disabled={submitting}
               type="button"
             >
               Batal
             </Button>
             <Button
-              onClick={handleCreate}
+              onClick={handleSubmit}
               disabled={submitting}
               type="submit"
               form="svc-form"
             >
-              {submitting ? "Menyimpan..." : "Simpan"}
+              {submitting ? "Menyimpan..." : editing ? "Update" : "Simpan"}
             </Button>
           </>
         }
       >
-        <form id="svc-form" onSubmit={handleCreate} className="space-y-3">
+        <form id="svc-form" onSubmit={handleSubmit} className="space-y-3">
           <Field label="Nama Layanan" required>
             <Input
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
               placeholder="Cuci Setrika Premium"
               required
+              autoFocus
             />
           </Field>
           <div className="grid grid-cols-2 gap-3">

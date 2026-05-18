@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Icon3D } from "@/components/ui/icon3d";
 import { useToast } from "@/components/ui/toast";
+import { BranchesManager } from "@/components/settings/branches-manager";
 import { cn } from "@/lib/utils";
 import {
   Building2,
@@ -332,47 +333,11 @@ export default function SettingsPage() {
             <Card>
               <CardHeader>
                 <CardTitle>Manajemen Cabang</CardTitle>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Tambah, edit, atau hapus cabang. Perubahan tersimpan ke database.
+                </p>
               </CardHeader>
-              <div className="p-4 sm:p-5 space-y-3">
-                {[
-                  { name: "Cabang Pusat", address: "Jl. Sudirman No. 12, Jakarta", staff: 8, color: "blue" as const },
-                  { name: "Cabang Selatan", address: "Jl. Kemang Raya 88, Jakarta", staff: 5, color: "cyan" as const },
-                  { name: "Cabang Utara", address: "Jl. Boulevard 21, Jakarta", staff: 4, color: "purple" as const },
-                ].map((b) => (
-                  <div
-                    key={b.name}
-                    className="flex items-center gap-3 p-3 rounded-xl border border-slate-200 hover:border-primary-200 hover:shadow-sm transition-all"
-                  >
-                    <Icon3D variant={b.color} size="md">
-                      <Building2 size={18} />
-                    </Icon3D>
-                    <div className="flex-1">
-                      <div className="font-semibold text-slate-900">{b.name}</div>
-                      <div className="text-xs text-slate-500">{b.address}</div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-sm font-bold text-slate-900">{b.staff}</div>
-                      <div className="text-xs text-slate-500">staff</div>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      type="button"
-                      onClick={() => handleAction(`Atur cabang ${b.name}`)}
-                    >
-                      Atur
-                    </Button>
-                  </div>
-                ))}
-                <Button
-                  className="w-full"
-                  variant="outline"
-                  type="button"
-                  onClick={() => handleAction("Tambah Cabang Baru")}
-                >
-                  + Tambah Cabang Baru
-                </Button>
-              </div>
+              <BranchesManager />
             </Card>
           )}
 

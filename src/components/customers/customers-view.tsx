@@ -9,6 +9,7 @@ import { Modal } from "@/components/ui/modal";
 import { Field, Textarea } from "@/components/ui/select";
 import { Icon3D } from "@/components/ui/icon3d";
 import { useToast } from "@/components/ui/toast";
+import { CustomerDetailModal } from "./customer-detail-modal";
 import { exportToCSV } from "@/lib/export";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import {
@@ -62,6 +63,7 @@ export function CustomersView({
   const [showCreate, setShowCreate] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState({ name: "", phone: "", address: "", notes: "" });
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
     return initialCustomers.filter((c) => {
@@ -303,7 +305,7 @@ export function CustomersView({
                   className="flex-1"
                   size="sm"
                   type="button"
-                  onClick={() => toast.info("Detail belum tersedia", "Coming soon")}
+                  onClick={() => setSelectedCustomerId(c.id)}
                 >
                   Detail
                 </Button>
@@ -386,6 +388,13 @@ export function CustomersView({
           </Field>
         </form>
       </Modal>
+
+      {/* Customer Detail Modal */}
+      <CustomerDetailModal
+        customerId={selectedCustomerId}
+        onClose={() => setSelectedCustomerId(null)}
+        onUpdate={() => router.refresh()}
+      />
     </>
   );
 }

@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/laundry-icons";
 import { useToast } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
-import { AlertTriangle, ArrowDown, ArrowUp, Plus, Truck } from "lucide-react";
+import { AlertTriangle, ArrowDown, ArrowUp, Edit2, Plus, Trash2, Truck } from "lucide-react";
 
 const categoryMeta: Record<
   string,
@@ -48,12 +48,19 @@ export function InventoryView({ initialInventory }: { initialInventory: Inventor
   const [adjustItem, setAdjustItem] = useState<{ item: InventoryItem; type: "in" | "out" } | null>(
     null
   );
+  const [editItem, setEditItem] = useState<InventoryItem | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [createForm, setCreateForm] = useState({
     name: "",
     category: "Sabun",
     unit: "kg",
     stock: 0,
+    minimumStock: 0,
+  });
+  const [editForm, setEditForm] = useState({
+    name: "",
+    category: "Sabun",
+    unit: "kg",
     minimumStock: 0,
   });
   const [adjustQty, setAdjustQty] = useState("");
@@ -116,6 +123,49 @@ export function InventoryView({ initialInventory }: { initialInventory: Inventor
       toast.error("Gagal update stok", String(err));
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const openEdit = (item: InventoryItem) => {
+    setEditItem(item);
+    setEditForm({
+      name: item.name,
+      category: item.category,
+      unit: item.unit,
+      minimumStock: item.minimumStock,
+    });
+  };
+
+  const handleEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editItem) return;
+    setSubmitting(true);
+    try {
+      const res = await fetch(`/api/inventory/${editItem.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(editForm),
+      });
+      if (!res.ok) throw new Error("Failed");
+      toast.success("Item ter-update", editForm.name);
+      setEditItem(null);
+      router.refresh();
+    } catch (err) {
+      toast.error("Gagal update", String(err));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDelete = async (item: InventoryItem) => {
+    if (!confirm(`Hapus item "${item.name}"?`)) return;
+    try {
+      const res = await fetch(`/api/inventory/${item.id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed");
+      toast.success("Item dihapus", item.name);
+      router.refresh();
+    } catch (err) {
+      toast.error("Gagal hapus", String(err));
     }
   };
 
@@ -244,6 +294,24 @@ export function InventoryView({ initialInventory }: { initialInventory: Inventor
                       {isLow && <Badge variant="warning">Low</Badge>}
                     </div>
                     <p className="text-xs text-slate-500">{item.category}</p>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => openEdit(item)}
+                      className="h-7 w-7 inline-flex items-center justify-center rounded-lg text-slate-400 hover:text-primary-600 hover:bg-primary-50"
+                      title="Edit"
+                    >
+                      <Edit2 size={12} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(item)}
+                      className="h-7 w-7 inline-flex items-center justify-center rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50"
+                      title="Hapus"
+                    >
+                      <Trash2 size={12} />
+                    </button>
                   </div>
                 </div>
 
@@ -458,6 +526,90 @@ export function InventoryView({ initialInventory }: { initialInventory: Inventor
             </p>
           </form>
         )}
+      </Modal>
+
+      {/* Edit Modal */}
+      <Modal
+        open={!!editItem}
+        onClose={() => setEditItem(null)}
+        title={editItem ? `Edit: ${editItem.name}` : ""}
+        size="md"
+        footer={
+          <>
+            <Button
+              variant="secondary"
+              onClick={() => setEditItem(null)}
+              disabled={submitting}
+              type="button"
+            >
+              Batal
+            </Button>
+            <Button
+              type="submit"
+              form="edit-inv-form"
+              onClick={handleEdit}
+              disabled={submitting}
+            >
+              {submitting ? "Menyimpan..." : "Update"}
+            </Button>
+          </>
+        }
+      >
+        <form id="edit-inv-form" onSubmit={handleEdit} className="space-y-3">
+          <Field label="Nama Item" required>
+            <Input
+              value={editForm.name}
+              onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+              required
+            />
+          </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Kategori" required>
+              <Select
+                value={editForm.category}
+                onChange={(e) =>
+                  setEditForm({ ...editForm, category: e.target.value })
+                }
+              >
+                {["Sabun", "Parfum", "Packaging", "Chemical"].map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="Unit" required>
+              <Select
+                value={editForm.unit}
+                onChange={(e) => setEditForm({ ...editForm, unit: e.target.value })}
+              >
+                {["kg", "L", "pcs", "box"].map((u) => (
+                  <option key={u} value={u}>
+                    {u}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          </div>
+          <Field label="Min. Stok">
+            <Input
+              type="number"
+              min="0"
+              step="0.01"
+              value={editForm.minimumStock}
+              onChange={(e) =>
+                setEditForm({
+                  ...editForm,
+                  minimumStock: parseFloat(e.target.value) || 0,
+                })
+              }
+            />
+          </Field>
+          <p className="text-xs text-slate-500">
+            Untuk update stok, gunakan tombol <strong>Stok Masuk</strong> atau{" "}
+            <strong>Stok Keluar</strong> di card item.
+          </p>
+        </form>
       </Modal>
     </>
   );

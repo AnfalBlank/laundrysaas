@@ -667,3 +667,191 @@ export async function createInventoryItem(input: {
   });
   return { id };
 }
+
+
+// ============ BRANCHES CRUD ============
+export async function createBranch(input: {
+  name: string;
+  address?: string;
+  phone?: string;
+}) {
+  const tenantId = getCurrentTenantId();
+  const id = generateId("branch");
+  await db.insert(branches).values({
+    id,
+    tenantId,
+    name: input.name,
+    address: input.address,
+    phone: input.phone,
+  });
+  return { id };
+}
+
+export async function updateBranch(
+  id: string,
+  input: { name?: string; address?: string; phone?: string; isActive?: boolean }
+) {
+  const tenantId = getCurrentTenantId();
+  const updates: Record<string, unknown> = {};
+  if (input.name !== undefined) updates.name = input.name;
+  if (input.address !== undefined) updates.address = input.address;
+  if (input.phone !== undefined) updates.phone = input.phone;
+  if (input.isActive !== undefined) updates.isActive = input.isActive;
+
+  await db
+    .update(branches)
+    .set(updates as never)
+    .where(and(eq(branches.id, id), eq(branches.tenantId, tenantId)));
+}
+
+export async function deleteBranch(id: string) {
+  const tenantId = getCurrentTenantId();
+  // Check if branch has orders
+  const [{ count }] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(orders)
+    .where(and(eq(orders.branchId, id), eq(orders.tenantId, tenantId)));
+  if (Number(count) > 0) {
+    throw new Error(`Cabang masih memiliki ${count} order. Hapus order dulu.`);
+  }
+  await db
+    .delete(branches)
+    .where(and(eq(branches.id, id), eq(branches.tenantId, tenantId)));
+}
+
+// ============ SERVICES UPDATE/DELETE ============
+export async function updateService(
+  id: string,
+  input: {
+    name?: string;
+    category?: "regular" | "express" | "special";
+    pricingType?: "per_kg" | "per_item" | "per_unit";
+    price?: number;
+    durationDays?: number;
+    isActive?: boolean;
+  }
+) {
+  const tenantId = getCurrentTenantId();
+  const updates: Record<string, unknown> = {};
+  if (input.name !== undefined) updates.name = input.name;
+  if (input.category !== undefined) updates.category = input.category;
+  if (input.pricingType !== undefined) updates.pricingType = input.pricingType;
+  if (input.price !== undefined) updates.price = input.price;
+  if (input.durationDays !== undefined) updates.durationDays = input.durationDays;
+  if (input.isActive !== undefined) updates.isActive = input.isActive;
+
+  await db
+    .update(services)
+    .set(updates as never)
+    .where(and(eq(services.id, id), eq(services.tenantId, tenantId)));
+}
+
+export async function deleteService(id: string) {
+  const tenantId = getCurrentTenantId();
+  // Soft delete
+  await db
+    .update(services)
+    .set({ isActive: false })
+    .where(and(eq(services.id, id), eq(services.tenantId, tenantId)));
+}
+
+// ============ CUSTOMERS UPDATE/DELETE ============
+export async function getCustomerById(id: string) {
+  const tenantId = getCurrentTenantId();
+  const [customer] = await db
+    .select()
+    .from(customers)
+    .where(and(eq(customers.id, id), eq(customers.tenantId, tenantId)))
+    .limit(1);
+  if (!customer) return null;
+
+  // Get orders history
+  const customerOrders = await db
+    .select({
+      id: orders.id,
+      invoice: orders.invoiceNumber,
+      status: orders.status,
+      total: orders.total,
+      createdAt: orders.createdAt,
+    })
+    .from(orders)
+    .where(and(eq(orders.customerId, id), eq(orders.tenantId, tenantId)))
+    .orderBy(desc(orders.createdAt))
+    .limit(20);
+
+  return { ...customer, orders: customerOrders };
+}
+
+export async function updateCustomer(
+  id: string,
+  input: {
+    name?: string;
+    phone?: string;
+    address?: string;
+    notes?: string;
+    tier?: "silver" | "gold" | "platinum";
+    isBlacklisted?: boolean;
+  }
+) {
+  const tenantId = getCurrentTenantId();
+  const updates: Record<string, unknown> = {};
+  if (input.name !== undefined) updates.name = input.name;
+  if (input.phone !== undefined) updates.phone = input.phone;
+  if (input.address !== undefined) updates.address = input.address;
+  if (input.notes !== undefined) updates.notes = input.notes;
+  if (input.tier !== undefined) updates.tier = input.tier;
+  if (input.isBlacklisted !== undefined) updates.isBlacklisted = input.isBlacklisted;
+
+  await db
+    .update(customers)
+    .set(updates as never)
+    .where(and(eq(customers.id, id), eq(customers.tenantId, tenantId)));
+}
+
+export async function deleteCustomer(id: string) {
+  const tenantId = getCurrentTenantId();
+  // Check if customer has orders
+  const [{ count }] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(orders)
+    .where(and(eq(orders.customerId, id), eq(orders.tenantId, tenantId)));
+  if (Number(count) > 0) {
+    throw new Error(
+      `Customer masih memiliki ${count} order. Gunakan blacklist daripada hapus.`
+    );
+  }
+  await db
+    .delete(customers)
+    .where(and(eq(customers.id, id), eq(customers.tenantId, tenantId)));
+}
+
+
+// ============ INVENTORY UPDATE/DELETE ============
+export async function updateInventoryItem(
+  id: string,
+  input: {
+    name?: string;
+    category?: string;
+    unit?: string;
+    minimumStock?: number;
+  }
+) {
+  const tenantId = getCurrentTenantId();
+  const updates: Record<string, unknown> = {};
+  if (input.name !== undefined) updates.name = input.name;
+  if (input.category !== undefined) updates.category = input.category;
+  if (input.unit !== undefined) updates.unit = input.unit;
+  if (input.minimumStock !== undefined) updates.minimumStock = input.minimumStock;
+
+  await db
+    .update(inventory)
+    .set(updates as never)
+    .where(and(eq(inventory.id, id), eq(inventory.tenantId, tenantId)));
+}
+
+export async function deleteInventoryItem(id: string) {
+  const tenantId = getCurrentTenantId();
+  await db
+    .delete(inventory)
+    .where(and(eq(inventory.id, id), eq(inventory.tenantId, tenantId)));
+}
