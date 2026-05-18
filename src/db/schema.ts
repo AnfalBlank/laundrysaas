@@ -110,6 +110,8 @@ export const customers = sqliteTable(
     isBlacklisted: integer("is_blacklisted", { mode: "boolean" })
       .notNull()
       .default(false),
+    telegramChatId: text("telegram_chat_id"),
+    telegramUsername: text("telegram_username"),
     createdAt: integer("created_at", { mode: "timestamp" })
       .notNull()
       .default(sql`(unixepoch())`),
@@ -117,6 +119,7 @@ export const customers = sqliteTable(
   (t) => ({
     tenantIdx: index("customers_tenant_idx").on(t.tenantId),
     phoneIdx: index("customers_phone_idx").on(t.tenantId, t.phone),
+    telegramIdx: index("customers_telegram_idx").on(t.telegramChatId),
   })
 );
 
