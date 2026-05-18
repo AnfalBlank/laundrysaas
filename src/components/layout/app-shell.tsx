@@ -1,8 +1,9 @@
 import { ReactNode } from "react";
 import { db } from "@/db/client";
-import { tenants, branches } from "@/db/schema";
+import { tenants, branches, users } from "@/db/schema";
 import { eq, and, sql } from "drizzle-orm";
 import { getCurrentTenantId } from "@/lib/tenant";
+import { getCurrentUser } from "@/lib/auth";
 import { AppShellClient } from "./app-shell-client";
 
 async function getTenantInfo() {
@@ -35,6 +36,25 @@ async function getTenantInfo() {
   }
 }
 
+async function listAllUsers() {
+  try {
+    const tenantId = getCurrentTenantId();
+    return db
+      .select({
+        id: users.id,
+        name: users.name,
+        email: users.email,
+        role: users.role,
+        branchName: branches.name,
+      })
+      .from(users)
+      .leftJoin(branches, eq(users.branchId, branches.id))
+      .where(and(eq(users.tenantId, tenantId), eq(users.isActive, true)));
+  } catch {
+    return [];
+  }
+}
+
 export async function AppShell({
   children,
   title,
@@ -44,9 +64,20 @@ export async function AppShell({
   title: string;
   subtitle?: string;
 }) {
-  const tenantInfo = await getTenantInfo();
+  const [tenantInfo, currentUser, allUsers] = await Promise.all([
+    getTenantInfo(),
+    getCurrentUser(),
+    listAllUsers(),
+  ]);
+
   return (
-    <AppShellClient title={title} subtitle={subtitle} tenant={tenantInfo}>
+    <AppShellClient
+      title={title}
+      subtitle={subtitle}
+      tenant={tenantInfo}
+      currentUser={currentUser}
+      allUsers={allUsers}
+    >
       {children}
     </AppShellClient>
   );
