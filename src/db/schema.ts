@@ -359,3 +359,169 @@ export type WhatsappTemplate = typeof whatsappTemplates.$inferSelect;
 export type NewOrder = typeof orders.$inferInsert;
 export type NewCustomer = typeof customers.$inferInsert;
 export type NewPickup = typeof pickups.$inferInsert;
+
+
+// === INVENTORY MOVEMENTS (track every stock change) ===
+export const inventoryMovements = sqliteTable(
+  "inventory_movements",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    inventoryId: text("inventory_id")
+      .notNull()
+      .references(() => inventory.id, { onDelete: "cascade" }),
+    type: text("type", { enum: ["in", "out", "adjustment"] }).notNull(),
+    quantity: real("quantity").notNull(),
+    unitCost: integer("unit_cost").default(0),
+    totalCost: integer("total_cost").default(0),
+    reason: text("reason"),
+    reference: text("reference"),
+    purchaseOrderId: text("purchase_order_id"),
+    orderId: text("order_id"),
+    notes: text("notes"),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`),
+  },
+  (t) => ({
+    tenantIdx: index("inv_mov_tenant_idx").on(t.tenantId),
+    invIdx: index("inv_mov_inv_idx").on(t.inventoryId),
+    typeIdx: index("inv_mov_type_idx").on(t.tenantId, t.type),
+  })
+);
+
+// === SUPPLIERS ===
+export const suppliers = sqliteTable(
+  "suppliers",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    phone: text("phone"),
+    email: text("email"),
+    address: text("address"),
+    contactPerson: text("contact_person"),
+    notes: text("notes"),
+    isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`),
+  },
+  (t) => ({
+    tenantIdx: index("suppliers_tenant_idx").on(t.tenantId),
+  })
+);
+
+// === PURCHASE ORDERS ===
+export const purchaseOrders = sqliteTable(
+  "purchase_orders",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    supplierId: text("supplier_id").references(() => suppliers.id),
+    poNumber: text("po_number").notNull(),
+    status: text("status", {
+      enum: ["draft", "ordered", "partial", "received", "cancelled"],
+    })
+      .notNull()
+      .default("draft"),
+    subtotal: integer("subtotal").notNull().default(0),
+    discount: integer("discount").notNull().default(0),
+    tax: integer("tax").notNull().default(0),
+    total: integer("total").notNull().default(0),
+    notes: text("notes"),
+    orderedAt: integer("ordered_at", { mode: "timestamp" }),
+    receivedAt: integer("received_at", { mode: "timestamp" }),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`),
+  },
+  (t) => ({
+    tenantIdx: index("po_tenant_idx").on(t.tenantId),
+    statusIdx: index("po_status_idx").on(t.tenantId, t.status),
+  })
+);
+
+export const purchaseOrderItems = sqliteTable(
+  "purchase_order_items",
+  {
+    id: text("id").primaryKey(),
+    purchaseOrderId: text("purchase_order_id")
+      .notNull()
+      .references(() => purchaseOrders.id, { onDelete: "cascade" }),
+    inventoryId: text("inventory_id")
+      .notNull()
+      .references(() => inventory.id),
+    itemName: text("item_name").notNull(),
+    quantity: real("quantity").notNull(),
+    unitPrice: integer("unit_price").notNull(),
+    total: integer("total").notNull(),
+    receivedQuantity: real("received_quantity").default(0),
+  },
+  (t) => ({
+    poIdx: index("po_items_po_idx").on(t.purchaseOrderId),
+  })
+);
+
+// === EXPENSES ===
+export const expenseCategories = sqliteTable(
+  "expense_categories",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    icon: text("icon"),
+    color: text("color").default("#64748b"),
+    isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
+  },
+  (t) => ({
+    tenantIdx: index("exp_cat_tenant_idx").on(t.tenantId),
+  })
+);
+
+export const expenses = sqliteTable(
+  "expenses",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    branchId: text("branch_id").references(() => branches.id),
+    categoryId: text("category_id").references(() => expenseCategories.id),
+    title: text("title").notNull(),
+    amount: integer("amount").notNull(),
+    paymentMethod: text("payment_method", {
+      enum: ["cash", "transfer", "qris", "ewallet", "other"],
+    })
+      .notNull()
+      .default("cash"),
+    vendor: text("vendor"),
+    receiptUrl: text("receipt_url"),
+    notes: text("notes"),
+    expenseDate: integer("expense_date", { mode: "timestamp" }).notNull(),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`),
+  },
+  (t) => ({
+    tenantIdx: index("expenses_tenant_idx").on(t.tenantId),
+    dateIdx: index("expenses_date_idx").on(t.tenantId, t.expenseDate),
+    categoryIdx: index("expenses_cat_idx").on(t.categoryId),
+  })
+);
+
+// Type exports
+export type InventoryMovement = typeof inventoryMovements.$inferSelect;
+export type Supplier = typeof suppliers.$inferSelect;
+export type PurchaseOrder = typeof purchaseOrders.$inferSelect;
+export type PurchaseOrderItem = typeof purchaseOrderItems.$inferSelect;
+export type Expense = typeof expenses.$inferSelect;
+export type ExpenseCategory = typeof expenseCategories.$inferSelect;

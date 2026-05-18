@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { adjustInventoryStock } from "@/db/repositories";
+import { adjustInventoryStockWithMovement } from "@/db/repositories";
 
 export const dynamic = "force-dynamic";
 
@@ -12,14 +12,16 @@ export async function POST(
     if (typeof body.delta !== "number") {
       return NextResponse.json({ error: "delta required" }, { status: 400 });
     }
-    const result = await adjustInventoryStock({
+    const result = await adjustInventoryStockWithMovement({
       inventoryId: params.id,
       delta: body.delta,
       reason: body.reason ?? "manual",
+      unitCost: body.unitCost,
+      reference: body.reference,
+      notes: body.notes,
     });
     return NextResponse.json(result);
   } catch (err) {
-    console.error(err);
     return NextResponse.json({ error: String(err) }, { status: 500 });
   }
 }

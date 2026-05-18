@@ -926,3 +926,618 @@ export async function deleteStaff(id: string) {
     .set({ isActive: false })
     .where(and(eq(users.id, id), eq(users.tenantId, tenantId)));
 }
+
+
+// ============ INVENTORY MOVEMENTS ============
+import {
+  inventoryMovements,
+  suppliers,
+  purchaseOrders,
+  purchaseOrderItems,
+  expenses,
+  expenseCategories,
+} from "./schema";
+
+export async function listInventoryMovements(opts?: {
+  inventoryId?: string;
+  limit?: number;
+  type?: "in" | "out" | "adjustment";
+}) {
+  const tenantId = getCurrentTenantId();
+  const conditions = [eq(inventoryMovements.tenantId, tenantId)];
+  if (opts?.inventoryId) {
+    conditions.push(eq(inventoryMovements.inventoryId, opts.inventoryId));
+  }
+  if (opts?.type) {
+    conditions.push(eq(inventoryMovements.type, opts.type));
+  }
+
+  return db
+    .select({
+      id: inventoryMovements.id,
+      type: inventoryMovements.type,
+      quantity: inventoryMovements.quantity,
+      unitCost: inventoryMovements.unitCost,
+      totalCost: inventoryMovements.totalCost,
+      reason: inventoryMovements.reason,
+      reference: inventoryMovements.reference,
+      notes: inventoryMovements.notes,
+      createdAt: inventoryMovements.createdAt,
+      inventoryName: inventory.name,
+      inventoryUnit: inventory.unit,
+    })
+    .from(inventoryMovements)
+    .leftJoin(inventory, eq(inventoryMovements.inventoryId, inventory.id))
+    .where(and(...conditions))
+    .orderBy(desc(inventoryMovements.createdAt))
+    .limit(opts?.limit ?? 50);
+}
+
+// Override adjustInventoryStock to also create movement record
+export async function adjustInventoryStockWithMovement(input: {
+  inventoryId: string;
+  delta: number;
+  reason: string;
+  unitCost?: number;
+  reference?: string;
+  notes?: string;
+}) {
+  const tenantId = getCurrentTenantId();
+  const [item] = await db
+    .select()
+    .from(inventory)
+    .where(and(eq(inventory.id, input.inventoryId), eq(inventory.tenantId, tenantId)));
+  if (!item) throw new Error("Item not found");
+
+  const newStock = Math.max(0, item.stock + input.delta);
+
+  // Update stock
+  await db
+    .update(inventory)
+    .set({ stock: newStock })
+    .where(eq(inventory.id, input.inventoryId));
+
+  // Record movement
+  const movementId = generateId("mov");
+  const quantity = Math.abs(input.delta);
+  const unitCost = input.unitCost ?? 0;
+  await db.insert(inventoryMovements).values({
+    id: movementId,
+    tenantId,
+    inventoryId: input.inventoryId,
+    type: input.delta > 0 ? "in" : "out",
+    quantity,
+    unitCost,
+    totalCost: unitCost * quantity,
+    reason: input.reason,
+    reference: input.reference,
+    notes: input.notes,
+  });
+
+  return { stock: newStock, movementId };
+}
+
+// ============ SUPPLIERS ============
+export async function listSuppliers() {
+  const tenantId = getCurrentTenantId();
+  return db
+    .select()
+    .from(suppliers)
+    .where(eq(suppliers.tenantId, tenantId))
+    .orderBy(suppliers.name);
+}
+
+export async function createSupplier(input: {
+  name: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  contactPerson?: string;
+  notes?: string;
+}) {
+  const tenantId = getCurrentTenantId();
+  const id = generateId("sup");
+  await db.insert(suppliers).values({
+    id,
+    tenantId,
+    name: input.name,
+    phone: input.phone,
+    email: input.email,
+    address: input.address,
+    contactPerson: input.contactPerson,
+    notes: input.notes,
+  });
+  return { id };
+}
+
+export async function updateSupplier(
+  id: string,
+  input: Partial<{ name: string; phone: string; email: string; address: string; isActive: boolean }>
+) {
+  const tenantId = getCurrentTenantId();
+  await db
+    .update(suppliers)
+    .set(input as never)
+    .where(and(eq(suppliers.id, id), eq(suppliers.tenantId, tenantId)));
+}
+
+export async function deleteSupplier(id: string) {
+  const tenantId = getCurrentTenantId();
+  await db
+    .delete(suppliers)
+    .where(and(eq(suppliers.id, id), eq(suppliers.tenantId, tenantId)));
+}
+
+// ============ PURCHASE ORDERS ============
+export async function listPurchaseOrders(opts?: { status?: string; limit?: number }) {
+  const tenantId = getCurrentTenantId();
+  const conditions = [eq(purchaseOrders.tenantId, tenantId)];
+  if (opts?.status) {
+    conditions.push(eq(purchaseOrders.status, opts.status as never));
+  }
+
+  return db
+    .select({
+      id: purchaseOrders.id,
+      poNumber: purchaseOrders.poNumber,
+      status: purchaseOrders.status,
+      subtotal: purchaseOrders.subtotal,
+      total: purchaseOrders.total,
+      orderedAt: purchaseOrders.orderedAt,
+      receivedAt: purchaseOrders.receivedAt,
+      createdAt: purchaseOrders.createdAt,
+      notes: purchaseOrders.notes,
+      supplierId: purchaseOrders.supplierId,
+      supplierName: suppliers.name,
+      supplierPhone: suppliers.phone,
+    })
+    .from(purchaseOrders)
+    .leftJoin(suppliers, eq(purchaseOrders.supplierId, suppliers.id))
+    .where(and(...conditions))
+    .orderBy(desc(purchaseOrders.createdAt))
+    .limit(opts?.limit ?? 50);
+}
+
+export async function getPurchaseOrderDetail(id: string) {
+  const tenantId = getCurrentTenantId();
+  const [po] = await db
+    .select({
+      id: purchaseOrders.id,
+      poNumber: purchaseOrders.poNumber,
+      status: purchaseOrders.status,
+      subtotal: purchaseOrders.subtotal,
+      discount: purchaseOrders.discount,
+      tax: purchaseOrders.tax,
+      total: purchaseOrders.total,
+      notes: purchaseOrders.notes,
+      orderedAt: purchaseOrders.orderedAt,
+      receivedAt: purchaseOrders.receivedAt,
+      createdAt: purchaseOrders.createdAt,
+      supplierId: purchaseOrders.supplierId,
+      supplierName: suppliers.name,
+    })
+    .from(purchaseOrders)
+    .leftJoin(suppliers, eq(purchaseOrders.supplierId, suppliers.id))
+    .where(and(eq(purchaseOrders.id, id), eq(purchaseOrders.tenantId, tenantId)));
+
+  if (!po) return null;
+
+  const items = await db
+    .select()
+    .from(purchaseOrderItems)
+    .where(eq(purchaseOrderItems.purchaseOrderId, id));
+
+  return { ...po, items };
+}
+
+export async function createPurchaseOrder(input: {
+  supplierId?: string;
+  items: { inventoryId: string; quantity: number; unitPrice: number }[];
+  discount?: number;
+  tax?: number;
+  notes?: string;
+}) {
+  const tenantId = getCurrentTenantId();
+  if (!input.items || input.items.length === 0) {
+    throw new Error("Items required");
+  }
+
+  // Generate PO number
+  const today = new Date();
+  const datePart = today.toISOString().slice(0, 10).replace(/-/g, "");
+  const [{ count }] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(purchaseOrders)
+    .where(eq(purchaseOrders.tenantId, tenantId));
+  const poNumber = `PO-${datePart}-${String(Number(count) + 1).padStart(3, "0")}`;
+
+  const poId = generateId("po");
+
+  // Get inventory items
+  const inventoryIds = input.items.map((i) => i.inventoryId);
+  const items = await db
+    .select()
+    .from(inventory)
+    .where(sql`${inventory.id} in ${inventoryIds}`);
+  const itemMap = new Map(items.map((i) => [i.id, i]));
+
+  // Calculate totals
+  const subtotal = input.items.reduce(
+    (s, i) => s + i.quantity * i.unitPrice,
+    0
+  );
+  const discount = input.discount ?? 0;
+  const tax = input.tax ?? 0;
+  const total = subtotal - discount + tax;
+
+  // Insert PO
+  await db.insert(purchaseOrders).values({
+    id: poId,
+    tenantId,
+    poNumber,
+    supplierId: input.supplierId,
+    status: "ordered",
+    subtotal,
+    discount,
+    tax,
+    total,
+    notes: input.notes,
+    orderedAt: new Date(),
+  });
+
+  // Insert items
+  await db.insert(purchaseOrderItems).values(
+    input.items.map((i) => {
+      const inv = itemMap.get(i.inventoryId);
+      return {
+        id: generateId("poi"),
+        purchaseOrderId: poId,
+        inventoryId: i.inventoryId,
+        itemName: inv?.name ?? "Unknown",
+        quantity: i.quantity,
+        unitPrice: i.unitPrice,
+        total: i.quantity * i.unitPrice,
+      };
+    })
+  );
+
+  return { id: poId, poNumber, total };
+}
+
+export async function receivePurchaseOrder(id: string) {
+  const tenantId = getCurrentTenantId();
+  const [po] = await db
+    .select()
+    .from(purchaseOrders)
+    .where(and(eq(purchaseOrders.id, id), eq(purchaseOrders.tenantId, tenantId)));
+  if (!po) throw new Error("PO not found");
+  if (po.status === "received") throw new Error("PO already received");
+
+  const items = await db
+    .select()
+    .from(purchaseOrderItems)
+    .where(eq(purchaseOrderItems.purchaseOrderId, id));
+
+  // For each item: add to stock + create movement
+  for (const item of items) {
+    const [inv] = await db
+      .select()
+      .from(inventory)
+      .where(eq(inventory.id, item.inventoryId));
+    if (!inv) continue;
+
+    await db
+      .update(inventory)
+      .set({ stock: inv.stock + item.quantity })
+      .where(eq(inventory.id, item.inventoryId));
+
+    await db.insert(inventoryMovements).values({
+      id: generateId("mov"),
+      tenantId,
+      inventoryId: item.inventoryId,
+      type: "in",
+      quantity: item.quantity,
+      unitCost: item.unitPrice,
+      totalCost: item.total,
+      reason: "purchase",
+      reference: po.poNumber,
+      purchaseOrderId: id,
+    });
+
+    await db
+      .update(purchaseOrderItems)
+      .set({ receivedQuantity: item.quantity })
+      .where(eq(purchaseOrderItems.id, item.id));
+  }
+
+  await db
+    .update(purchaseOrders)
+    .set({ status: "received", receivedAt: new Date() })
+    .where(eq(purchaseOrders.id, id));
+
+  return { ok: true };
+}
+
+export async function cancelPurchaseOrder(id: string) {
+  const tenantId = getCurrentTenantId();
+  await db
+    .update(purchaseOrders)
+    .set({ status: "cancelled" })
+    .where(and(eq(purchaseOrders.id, id), eq(purchaseOrders.tenantId, tenantId)));
+}
+
+// ============ EXPENSES ============
+export async function listExpenseCategories() {
+  const tenantId = getCurrentTenantId();
+  return db
+    .select()
+    .from(expenseCategories)
+    .where(
+      and(eq(expenseCategories.tenantId, tenantId), eq(expenseCategories.isActive, true))
+    )
+    .orderBy(expenseCategories.name);
+}
+
+export async function listExpenses(opts?: {
+  startDate?: Date;
+  endDate?: Date;
+  categoryId?: string;
+  limit?: number;
+}) {
+  const tenantId = getCurrentTenantId();
+  const conditions = [eq(expenses.tenantId, tenantId)];
+
+  if (opts?.startDate) {
+    conditions.push(
+      sql`${expenses.expenseDate} >= ${Math.floor(opts.startDate.getTime() / 1000)}`
+    );
+  }
+  if (opts?.endDate) {
+    conditions.push(
+      sql`${expenses.expenseDate} <= ${Math.floor(opts.endDate.getTime() / 1000)}`
+    );
+  }
+  if (opts?.categoryId) {
+    conditions.push(eq(expenses.categoryId, opts.categoryId));
+  }
+
+  return db
+    .select({
+      id: expenses.id,
+      title: expenses.title,
+      amount: expenses.amount,
+      paymentMethod: expenses.paymentMethod,
+      vendor: expenses.vendor,
+      notes: expenses.notes,
+      expenseDate: expenses.expenseDate,
+      createdAt: expenses.createdAt,
+      branchId: expenses.branchId,
+      branchName: branches.name,
+      categoryId: expenses.categoryId,
+      categoryName: expenseCategories.name,
+      categoryColor: expenseCategories.color,
+      categoryIcon: expenseCategories.icon,
+    })
+    .from(expenses)
+    .leftJoin(branches, eq(expenses.branchId, branches.id))
+    .leftJoin(expenseCategories, eq(expenses.categoryId, expenseCategories.id))
+    .where(and(...conditions))
+    .orderBy(desc(expenses.expenseDate))
+    .limit(opts?.limit ?? 100);
+}
+
+export async function createExpense(input: {
+  title: string;
+  amount: number;
+  categoryId?: string;
+  branchId?: string;
+  paymentMethod?: "cash" | "transfer" | "qris" | "ewallet" | "other";
+  vendor?: string;
+  notes?: string;
+  expenseDate: Date;
+}) {
+  const tenantId = getCurrentTenantId();
+  const id = generateId("exp");
+  await db.insert(expenses).values({
+    id,
+    tenantId,
+    title: input.title,
+    amount: input.amount,
+    categoryId: input.categoryId,
+    branchId: input.branchId,
+    paymentMethod: input.paymentMethod ?? "cash",
+    vendor: input.vendor,
+    notes: input.notes,
+    expenseDate: input.expenseDate,
+  });
+  return { id };
+}
+
+export async function updateExpense(
+  id: string,
+  input: Partial<{
+    title: string;
+    amount: number;
+    categoryId: string;
+    branchId: string;
+    paymentMethod: "cash" | "transfer" | "qris" | "ewallet" | "other";
+    vendor: string;
+    notes: string;
+    expenseDate: Date;
+  }>
+) {
+  const tenantId = getCurrentTenantId();
+  await db
+    .update(expenses)
+    .set(input as never)
+    .where(and(eq(expenses.id, id), eq(expenses.tenantId, tenantId)));
+}
+
+export async function deleteExpense(id: string) {
+  const tenantId = getCurrentTenantId();
+  await db
+    .delete(expenses)
+    .where(and(eq(expenses.id, id), eq(expenses.tenantId, tenantId)));
+}
+
+export async function getExpenseSummary(opts?: { startDate?: Date; endDate?: Date }) {
+  const tenantId = getCurrentTenantId();
+  const conditions = [eq(expenses.tenantId, tenantId)];
+  if (opts?.startDate) {
+    conditions.push(
+      sql`${expenses.expenseDate} >= ${Math.floor(opts.startDate.getTime() / 1000)}`
+    );
+  }
+  if (opts?.endDate) {
+    conditions.push(
+      sql`${expenses.expenseDate} <= ${Math.floor(opts.endDate.getTime() / 1000)}`
+    );
+  }
+
+  const [totals] = await db
+    .select({
+      total: sql<number>`coalesce(sum(${expenses.amount}), 0)`,
+      count: sql<number>`count(*)`,
+    })
+    .from(expenses)
+    .where(and(...conditions));
+
+  const byCategory = await db
+    .select({
+      categoryId: expenses.categoryId,
+      categoryName: expenseCategories.name,
+      categoryColor: expenseCategories.color,
+      total: sql<number>`coalesce(sum(${expenses.amount}), 0)`,
+      count: sql<number>`count(*)`,
+    })
+    .from(expenses)
+    .leftJoin(expenseCategories, eq(expenses.categoryId, expenseCategories.id))
+    .where(and(...conditions))
+    .groupBy(expenses.categoryId);
+
+  return {
+    total: Number(totals?.total ?? 0),
+    count: Number(totals?.count ?? 0),
+    byCategory: byCategory.map((c) => ({
+      categoryId: c.categoryId,
+      name: c.categoryName ?? "Uncategorized",
+      color: c.categoryColor ?? "#94a3b8",
+      total: Number(c.total),
+      count: Number(c.count),
+    })),
+  };
+}
+
+// ============ COMPREHENSIVE P&L REPORT ============
+export async function getProfitAndLoss(opts: { startDate: Date; endDate: Date }) {
+  const tenantId = getCurrentTenantId();
+  const start = Math.floor(opts.startDate.getTime() / 1000);
+  const end = Math.floor(opts.endDate.getTime() / 1000);
+
+  // Revenue from paid orders
+  const [revenue] = await db
+    .select({
+      total: sql<number>`coalesce(sum(${orders.total}), 0)`,
+      count: sql<number>`count(*)`,
+    })
+    .from(orders)
+    .where(
+      and(
+        eq(orders.tenantId, tenantId),
+        eq(orders.paymentStatus, "paid"),
+        sql`${orders.createdAt} between ${start} and ${end}`
+      )
+    );
+
+  // COGS - inventory used (out movements with cost)
+  const [cogs] = await db
+    .select({
+      total: sql<number>`coalesce(sum(${inventoryMovements.totalCost}), 0)`,
+    })
+    .from(inventoryMovements)
+    .where(
+      and(
+        eq(inventoryMovements.tenantId, tenantId),
+        eq(inventoryMovements.type, "out"),
+        sql`${inventoryMovements.createdAt} between ${start} and ${end}`
+      )
+    );
+
+  // Operating expenses
+  const [opex] = await db
+    .select({
+      total: sql<number>`coalesce(sum(${expenses.amount}), 0)`,
+    })
+    .from(expenses)
+    .where(
+      and(
+        eq(expenses.tenantId, tenantId),
+        sql`${expenses.expenseDate} between ${start} and ${end}`
+      )
+    );
+
+  // Expenses by category
+  const expensesByCategory = await db
+    .select({
+      categoryId: expenses.categoryId,
+      categoryName: expenseCategories.name,
+      categoryColor: expenseCategories.color,
+      total: sql<number>`coalesce(sum(${expenses.amount}), 0)`,
+    })
+    .from(expenses)
+    .leftJoin(expenseCategories, eq(expenses.categoryId, expenseCategories.id))
+    .where(
+      and(
+        eq(expenses.tenantId, tenantId),
+        sql`${expenses.expenseDate} between ${start} and ${end}`
+      )
+    )
+    .groupBy(expenses.categoryId);
+
+  // Revenue by service
+  const revenueByService = await db
+    .select({
+      serviceName: orderItems.serviceName,
+      total: sql<number>`coalesce(sum(${orderItems.total}), 0)`,
+      count: sql<number>`count(*)`,
+    })
+    .from(orderItems)
+    .innerJoin(orders, eq(orderItems.orderId, orders.id))
+    .where(
+      and(
+        eq(orders.tenantId, tenantId),
+        eq(orders.paymentStatus, "paid"),
+        sql`${orders.createdAt} between ${start} and ${end}`
+      )
+    )
+    .groupBy(orderItems.serviceName);
+
+  const totalRevenue = Number(revenue?.total ?? 0);
+  const totalCOGS = Number(cogs?.total ?? 0);
+  const totalOPEX = Number(opex?.total ?? 0);
+  const grossProfit = totalRevenue - totalCOGS;
+  const netProfit = grossProfit - totalOPEX;
+  const grossMargin = totalRevenue > 0 ? (grossProfit / totalRevenue) * 100 : 0;
+  const netMargin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
+
+  return {
+    revenue: totalRevenue,
+    revenueCount: Number(revenue?.count ?? 0),
+    cogs: totalCOGS,
+    grossProfit,
+    grossMargin,
+    opex: totalOPEX,
+    netProfit,
+    netMargin,
+    expensesByCategory: expensesByCategory.map((c) => ({
+      name: c.categoryName ?? "Lain-lain",
+      color: c.categoryColor ?? "#94a3b8",
+      total: Number(c.total),
+    })),
+    revenueByService: revenueByService.map((s) => ({
+      name: s.serviceName,
+      total: Number(s.total),
+      count: Number(s.count),
+    })),
+  };
+}

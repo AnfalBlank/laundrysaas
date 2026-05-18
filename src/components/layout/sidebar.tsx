@@ -18,6 +18,8 @@ import {
   Settings,
   Sparkles,
   X,
+  Wallet,
+  ClipboardList,
 } from "lucide-react";
 import { Icon3D } from "@/components/ui/icon3d";
 import { HouseSimple3D } from "@/components/ui/laundry-icons";
@@ -38,8 +40,10 @@ const navItems: NavItem[] = [
   { label: "Customers", href: "/customers", icon: <Users size={18} />, variant: "purple" },
   { label: "Services", href: "/services", icon: <ListChecks size={18} />, variant: "teal" },
   { label: "Payments", href: "/payments", icon: <CreditCard size={18} />, variant: "green" },
+  { label: "Expenses", href: "/expenses", icon: <Wallet size={18} />, variant: "red" },
   { label: "Reports", href: "/reports", icon: <BarChart3 size={18} />, variant: "indigo" },
   { label: "Inventory", href: "/inventory", icon: <Boxes size={18} />, variant: "amber" },
+  { label: "Purchase Orders", href: "/purchase-orders", icon: <ClipboardList size={18} />, variant: "orange" },
   { label: "Staff", href: "/staff", icon: <UserCog size={18} />, variant: "pink" },
   { label: "WhatsApp", href: "/whatsapp", icon: <MessageCircleMore size={18} />, variant: "green", badge: "3" },
   { label: "Marketing", href: "/marketing", icon: <Megaphone size={18} />, variant: "red" },
