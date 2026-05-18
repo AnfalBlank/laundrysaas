@@ -2,7 +2,17 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Bell, Search, Menu, MessageCircle, User, LogOut, X, ArrowLeftRight, Settings } from "lucide-react";
+import {
+  Bell,
+  Search,
+  Menu,
+  MessageCircle,
+  User,
+  LogOut,
+  X,
+  ArrowLeftRight,
+  Settings,
+} from "lucide-react";
 import { Icon3D } from "@/components/ui/icon3d";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/toast";
@@ -49,6 +59,12 @@ export function Topbar({
   const [searchQuery, setSearchQuery] = useState("");
   const [switching, setSwitching] = useState(false);
 
+  const closeAll = () => {
+    setShowNotif(false);
+    setShowChat(false);
+    setShowProfile(false);
+  };
+
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (!searchQuery.trim()) return;
@@ -81,7 +97,6 @@ export function Topbar({
       toast.success(`Login sebagai ${name}`, ROLE_LABELS[role as keyof typeof ROLE_LABELS]);
       setShowSwitcher(false);
       setShowProfile(false);
-      // Full page reload to re-fetch server components with new user
       setTimeout(() => {
         window.location.href = "/";
       }, 300);
@@ -124,7 +139,10 @@ export function Topbar({
             )}
           </div>
 
-          <form onSubmit={handleSearch} className="hidden md:block relative w-56 lg:w-72 shrink-0">
+          <form
+            onSubmit={handleSearch}
+            className="hidden md:block relative w-56 lg:w-72 shrink-0"
+          >
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <Input
               value={searchQuery}
@@ -146,9 +164,9 @@ export function Topbar({
           <button
             type="button"
             onClick={() => {
-              setShowChat(!showChat);
-              setShowNotif(false);
-              setShowProfile(false);
+              const next = !showChat;
+              closeAll();
+              setShowChat(next);
             }}
             className="hidden sm:inline-flex relative h-10 w-10 items-center justify-center rounded-xl text-slate-600 hover:bg-slate-100 shrink-0"
             aria-label="Messages"
@@ -160,9 +178,9 @@ export function Topbar({
           <button
             type="button"
             onClick={() => {
-              setShowNotif(!showNotif);
-              setShowChat(false);
-              setShowProfile(false);
+              const next = !showNotif;
+              closeAll();
+              setShowNotif(next);
             }}
             className="relative h-10 w-10 inline-flex items-center justify-center rounded-xl text-slate-600 hover:bg-slate-100 shrink-0"
             aria-label="Notifications"
@@ -173,13 +191,13 @@ export function Topbar({
             </span>
           </button>
 
-          {/* Profile */}
+          {/* Profile button */}
           <button
             type="button"
             onClick={() => {
-              setShowProfile(!showProfile);
-              setShowNotif(false);
-              setShowChat(false);
+              const next = !showProfile;
+              closeAll();
+              setShowProfile(next);
             }}
             className="flex items-center gap-2 sm:gap-2.5 sm:pl-2 shrink-0"
           >
@@ -194,157 +212,167 @@ export function Topbar({
             </Icon3D>
           </button>
         </div>
+      </header>
 
-        {/* Notification dropdown */}
-        {showNotif && (
-          <div className="absolute right-4 top-[60px] w-80 max-w-[calc(100vw-2rem)] bg-white rounded-2xl shadow-xl border border-slate-200 z-50 overflow-hidden">
-            <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
-              <h3 className="font-semibold text-sm text-slate-900">Notifikasi</h3>
-              <button
-                type="button"
-                onClick={() => {
-                  toast.success("Semua dibaca");
-                  setShowNotif(false);
-                }}
-                className="text-xs text-primary-600 font-semibold hover:text-primary-700"
-              >
-                Tandai semua dibaca
-              </button>
-            </div>
-            <div className="max-h-80 overflow-y-auto divide-y divide-slate-100">
-              {notifications.map((n) => (
-                <button
-                  key={n.id}
-                  type="button"
-                  onClick={() => {
-                    setShowNotif(false);
-                    toast.info(n.text);
-                  }}
-                  className="w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors flex items-start gap-3"
-                >
-                  {n.unread && (
-                    <span className="w-2 h-2 rounded-full bg-primary-500 mt-1.5 shrink-0" />
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm text-slate-800 line-clamp-2">{n.text}</p>
-                    <p className="text-[11px] text-slate-400 mt-0.5">{n.time} lalu</p>
-                  </div>
-                </button>
-              ))}
-            </div>
-            <div className="px-4 py-2.5 border-t border-slate-100">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowNotif(false);
-                  router.push("/notifications");
-                }}
-                className="text-xs text-primary-600 font-semibold hover:text-primary-700 w-full text-center"
-              >
-                Lihat semua notifikasi
-              </button>
-            </div>
+      {/* Backdrop overlay (click outside to close) */}
+      {(showNotif || showChat || showProfile) && (
+        <button
+          type="button"
+          aria-label="Close menu"
+          className="fixed inset-0 z-[60] bg-transparent cursor-default"
+          onClick={closeAll}
+        />
+      )}
+
+      {/* Notification dropdown */}
+      {showNotif && (
+        <div className="fixed right-3 sm:right-5 top-[60px] w-80 max-w-[calc(100vw-1.5rem)] bg-white rounded-2xl shadow-2xl border border-slate-200 z-[70] overflow-hidden">
+          <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+            <h3 className="font-semibold text-sm text-slate-900">Notifikasi</h3>
+            <button
+              type="button"
+              onClick={() => {
+                toast.success("Semua dibaca");
+                setShowNotif(false);
+              }}
+              className="text-xs text-primary-600 font-semibold hover:text-primary-700"
+            >
+              Tandai semua dibaca
+            </button>
           </div>
-        )}
-
-        {/* Chat dropdown */}
-        {showChat && (
-          <div className="absolute right-4 top-[60px] w-80 max-w-[calc(100vw-2rem)] bg-white rounded-2xl shadow-xl border border-slate-200 z-50 overflow-hidden">
-            <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
-              <h3 className="font-semibold text-sm text-slate-900">Pesan WhatsApp</h3>
+          <div className="max-h-80 overflow-y-auto divide-y divide-slate-100">
+            {notifications.map((n) => (
               <button
+                key={n.id}
+                type="button"
+                onClick={() => {
+                  setShowNotif(false);
+                  toast.info(n.text);
+                }}
+                className="w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors flex items-start gap-3"
+              >
+                {n.unread && (
+                  <span className="w-2 h-2 rounded-full bg-primary-500 mt-1.5 shrink-0" />
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-slate-800 line-clamp-2">{n.text}</p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">{n.time} lalu</p>
+                </div>
+              </button>
+            ))}
+          </div>
+          <div className="px-4 py-2.5 border-t border-slate-100">
+            <button
+              type="button"
+              onClick={() => {
+                setShowNotif(false);
+                router.push("/notifications");
+              }}
+              className="text-xs text-primary-600 font-semibold hover:text-primary-700 w-full text-center"
+            >
+              Lihat semua notifikasi
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Chat dropdown */}
+      {showChat && (
+        <div className="fixed right-3 sm:right-5 top-[60px] w-80 max-w-[calc(100vw-1.5rem)] bg-white rounded-2xl shadow-2xl border border-slate-200 z-[70] overflow-hidden">
+          <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+            <h3 className="font-semibold text-sm text-slate-900">Pesan WhatsApp</h3>
+            <button
+              type="button"
+              onClick={() => {
+                setShowChat(false);
+                router.push("/whatsapp");
+              }}
+              className="text-xs text-primary-600 font-semibold hover:text-primary-700"
+            >
+              Buka semua
+            </button>
+          </div>
+          <div className="max-h-80 overflow-y-auto divide-y divide-slate-100">
+            {[
+              { name: "Andi Pratama", msg: "Laundry saya udah selesai belum?", time: "10 mnt" },
+              { name: "Budi Santoso", msg: "Mau tambahin parfum lavender", time: "1 jam" },
+              { name: "Hendra Wijaya", msg: "Oke siap, ditunggu drivernya", time: "2 jam" },
+            ].map((c, i) => (
+              <button
+                key={i}
                 type="button"
                 onClick={() => {
                   setShowChat(false);
                   router.push("/whatsapp");
                 }}
-                className="text-xs text-primary-600 font-semibold hover:text-primary-700"
+                className="w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors flex items-start gap-3"
               >
-                Buka semua
+                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-green-400 to-emerald-600 flex items-center justify-center text-white font-bold text-xs shrink-0">
+                  {c.name.charAt(0)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-semibold text-sm text-slate-900 truncate">
+                      {c.name}
+                    </span>
+                    <span className="text-[10px] text-slate-400 shrink-0">{c.time}</span>
+                  </div>
+                  <p className="text-xs text-slate-500 truncate">{c.msg}</p>
+                </div>
               </button>
-            </div>
-            <div className="max-h-80 overflow-y-auto divide-y divide-slate-100">
-              {[
-                { name: "Andi Pratama", msg: "Laundry saya udah selesai belum?", time: "10 mnt" },
-                { name: "Budi Santoso", msg: "Mau tambahin parfum lavender", time: "1 jam" },
-                { name: "Hendra Wijaya", msg: "Oke siap, ditunggu drivernya", time: "2 jam" },
-              ].map((c, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  onClick={() => {
-                    setShowChat(false);
-                    router.push("/whatsapp");
-                  }}
-                  className="w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors flex items-start gap-3"
-                >
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-green-400 to-emerald-600 flex items-center justify-center text-white font-bold text-xs shrink-0">
-                    {c.name.charAt(0)}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-semibold text-sm text-slate-900 truncate">
-                        {c.name}
-                      </span>
-                      <span className="text-[10px] text-slate-400 shrink-0">{c.time}</span>
-                    </div>
-                    <p className="text-xs text-slate-500 truncate">{c.msg}</p>
-                  </div>
-                </button>
-              ))}
-            </div>
+            ))}
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Profile dropdown */}
-        {showProfile && (
-          <div className="absolute right-4 top-[60px] w-64 bg-white rounded-2xl shadow-xl border border-slate-200 z-50 overflow-hidden">
-            <div className="px-4 py-3 border-b border-slate-100">
-              <div className="font-semibold text-sm text-slate-900">{displayName}</div>
-              <div className="text-xs text-slate-500">{currentUser?.email ?? "—"}</div>
-              <div className="mt-1 inline-block text-[10px] font-bold uppercase tracking-wide bg-primary-100 text-primary-700 px-2 py-0.5 rounded-md">
-                {displayRole}
-              </div>
-            </div>
-            <div className="py-1">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowProfile(false);
-                  setShowSwitcher(true);
-                }}
-                className="w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors flex items-center gap-2"
-              >
-                <ArrowLeftRight size={14} /> Switch User (Demo)
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowProfile(false);
-                  if (currentUser?.role === "owner") {
-                    window.location.href = "/settings";
-                  } else {
-                    toast.info("Hubungi Owner untuk pengaturan akun");
-                  }
-                }}
-                className="w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors flex items-center gap-2"
-              >
-                <Settings size={14} /> Pengaturan Akun
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowProfile(false);
-                  handleLogout();
-                }}
-                className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors flex items-center gap-2"
-              >
-                <LogOut size={14} /> Keluar
-              </button>
+      {/* Profile dropdown */}
+      {showProfile && (
+        <div className="fixed right-3 sm:right-5 top-[60px] w-64 bg-white rounded-2xl shadow-2xl border border-slate-200 z-[70] overflow-hidden">
+          <div className="px-4 py-3 border-b border-slate-100">
+            <div className="font-semibold text-sm text-slate-900 truncate">{displayName}</div>
+            <div className="text-xs text-slate-500 truncate">{currentUser?.email ?? "—"}</div>
+            <div className="mt-1 inline-block text-[10px] font-bold uppercase tracking-wide bg-primary-100 text-primary-700 px-2 py-0.5 rounded-md">
+              {displayRole}
             </div>
           </div>
-        )}
-      </header>
+          <div className="py-1">
+            <button
+              type="button"
+              onClick={() => {
+                setShowProfile(false);
+                setShowSwitcher(true);
+              }}
+              className="w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors flex items-center gap-2"
+            >
+              <ArrowLeftRight size={14} /> Switch User (Demo)
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setShowProfile(false);
+                if (currentUser?.role === "owner") {
+                  window.location.href = "/settings";
+                } else {
+                  toast.info("Hubungi Owner untuk pengaturan akun");
+                }
+              }}
+              className="w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors flex items-center gap-2"
+            >
+              <Settings size={14} /> Pengaturan Akun
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setShowProfile(false);
+                handleLogout();
+              }}
+              className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors flex items-center gap-2"
+            >
+              <LogOut size={14} /> Keluar
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Mobile search overlay */}
       {showSearch && (
@@ -374,7 +402,7 @@ export function Topbar({
       {/* User Switcher Modal (demo) */}
       {showSwitcher && (
         <div
-          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm"
+          className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm"
           onClick={() => setShowSwitcher(false)}
         >
           <div
@@ -415,12 +443,7 @@ export function Topbar({
                         : "hover:bg-slate-50"
                     }`}
                   >
-                    <Icon3D
-                      variant={
-                        roleColors[u.role] ?? "blue"
-                      }
-                      size="md"
-                    >
+                    <Icon3D variant={roleColors[u.role] ?? "blue"} size="md">
                       <User size={18} />
                     </Icon3D>
                     <div className="flex-1 min-w-0 text-left">
@@ -443,18 +466,6 @@ export function Topbar({
             </div>
           </div>
         </div>
-      )}
-
-      {(showNotif || showChat || showProfile) && (
-        <div
-          className="fixed inset-0 z-40"
-          onClick={() => {
-            setShowNotif(false);
-            setShowChat(false);
-            setShowProfile(false);
-          }}
-          aria-hidden="true"
-        />
       )}
     </>
   );
