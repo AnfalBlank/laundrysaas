@@ -855,3 +855,74 @@ export async function deleteInventoryItem(id: string) {
     .delete(inventory)
     .where(and(eq(inventory.id, id), eq(inventory.tenantId, tenantId)));
 }
+
+
+// ============ STAFF / USERS CRUD ============
+export async function createStaff(input: {
+  name: string;
+  email: string;
+  phone?: string;
+  role: "owner" | "admin" | "staff" | "driver";
+  branchId?: string;
+}) {
+  const tenantId = getCurrentTenantId();
+  const id = generateId("usr");
+  await db.insert(users).values({
+    id,
+    tenantId,
+    name: input.name,
+    email: input.email,
+    phone: input.phone,
+    role: input.role,
+    branchId: input.branchId,
+    passwordHash: "$2b$10$default", // TODO: real password hashing
+  });
+
+  // If role is driver, also create driver entry
+  if (input.role === "driver") {
+    await db.insert(drivers).values({
+      id: generateId("drv"),
+      tenantId,
+      userId: id,
+      name: input.name,
+      phone: input.phone,
+    });
+  }
+
+  return { id };
+}
+
+export async function updateStaff(
+  id: string,
+  input: {
+    name?: string;
+    email?: string;
+    phone?: string;
+    role?: "owner" | "admin" | "staff" | "driver";
+    branchId?: string;
+    isActive?: boolean;
+  }
+) {
+  const tenantId = getCurrentTenantId();
+  const updates: Record<string, unknown> = {};
+  if (input.name !== undefined) updates.name = input.name;
+  if (input.email !== undefined) updates.email = input.email;
+  if (input.phone !== undefined) updates.phone = input.phone;
+  if (input.role !== undefined) updates.role = input.role;
+  if (input.branchId !== undefined) updates.branchId = input.branchId;
+  if (input.isActive !== undefined) updates.isActive = input.isActive;
+
+  await db
+    .update(users)
+    .set(updates as never)
+    .where(and(eq(users.id, id), eq(users.tenantId, tenantId)));
+}
+
+export async function deleteStaff(id: string) {
+  const tenantId = getCurrentTenantId();
+  // Soft delete via deactivate
+  await db
+    .update(users)
+    .set({ isActive: false })
+    .where(and(eq(users.id, id), eq(users.tenantId, tenantId)));
+}

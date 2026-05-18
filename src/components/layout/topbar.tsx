@@ -183,7 +183,7 @@ export function Topbar({ title, subtitle, onMenuClick }: TopbarProps) {
                 type="button"
                 onClick={() => {
                   setShowNotif(false);
-                  toast.info("Halaman notifikasi", "Fitur akan segera tersedia");
+                  router.push("/notifications");
                 }}
                 className="text-xs text-primary-600 font-semibold hover:text-primary-700 w-full text-center"
               >
