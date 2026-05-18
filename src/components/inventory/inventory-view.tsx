@@ -41,9 +41,30 @@ interface InventoryItem {
   minimumStock: number;
 }
 
-export function InventoryView({ initialInventory }: { initialInventory: InventoryItem[] }) {
+interface Movement {
+  id: string;
+  type: string;
+  quantity: number;
+  unitCost: number | null;
+  totalCost: number | null;
+  reason: string | null;
+  reference: string | null;
+  notes: string | null;
+  createdAt: Date;
+  inventoryName: string | null;
+  inventoryUnit: string | null;
+}
+
+export function InventoryView({
+  initialInventory,
+  initialMovements,
+}: {
+  initialInventory: InventoryItem[];
+  initialMovements: Movement[];
+}) {
   const router = useRouter();
   const toast = useToast();
+  const [tab, setTab] = useState<"items" | "history">("items");
   const [showCreate, setShowCreate] = useState(false);
   const [adjustItem, setAdjustItem] = useState<{ item: InventoryItem; type: "in" | "out" } | null>(
     null
@@ -171,8 +192,132 @@ export function InventoryView({ initialInventory }: { initialInventory: Inventor
 
   return (
     <>
-      {/* Alerts */}
-      {lowStock.length > 0 && (
+      {/* Tabs */}
+      <div className="flex items-center gap-2 mb-4">
+        <button
+          type="button"
+          onClick={() => setTab("items")}
+          className={cn(
+            "px-4 py-2 rounded-xl text-sm font-semibold transition-all",
+            tab === "items"
+              ? "bg-gradient-to-br from-primary-500 to-accent-500 text-white shadow-md shadow-primary-500/30"
+              : "bg-white text-slate-600 border border-slate-200 hover:border-primary-200"
+          )}
+        >
+          Daftar Item
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab("history")}
+          className={cn(
+            "px-4 py-2 rounded-xl text-sm font-semibold transition-all",
+            tab === "history"
+              ? "bg-gradient-to-br from-primary-500 to-accent-500 text-white shadow-md shadow-primary-500/30"
+              : "bg-white text-slate-600 border border-slate-200 hover:border-primary-200"
+          )}
+        >
+          History Pemakaian
+          <span className="ml-2 text-[10px] bg-white/20 px-1.5 py-0.5 rounded-full">
+            {initialMovements.length}
+          </span>
+        </button>
+      </div>
+
+      {tab === "history" && (
+        <Card className="overflow-hidden">
+          <CardHeader>
+            <CardTitle>History Stock Movement</CardTitle>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Catatan setiap perubahan stok (masuk / keluar / adjustment)
+            </p>
+          </CardHeader>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[700px]">
+              <thead className="bg-slate-50/80">
+                <tr className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                  <th className="px-5 py-3.5">Tanggal</th>
+                  <th className="px-5 py-3.5">Item</th>
+                  <th className="px-5 py-3.5">Type</th>
+                  <th className="px-5 py-3.5">Qty</th>
+                  <th className="px-5 py-3.5">Reason</th>
+                  <th className="px-5 py-3.5">Reference</th>
+                  <th className="px-5 py-3.5 text-right">Total Cost</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {initialMovements.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="px-5 py-12 text-center text-sm text-slate-400">
+                      Belum ada pergerakan stok. Lakukan adjust stok untuk melihat history.
+                    </td>
+                  </tr>
+                )}
+                {initialMovements.map((m) => (
+                  <tr key={m.id} className="hover:bg-slate-50/60">
+                    <td className="px-5 py-3.5 text-xs text-slate-600 whitespace-nowrap">
+                      {new Date(m.createdAt).toLocaleString("id-ID", {
+                        day: "2-digit",
+                        month: "short",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </td>
+                    <td className="px-5 py-3.5">
+                      <div className="font-medium text-slate-900">
+                        {m.inventoryName ?? "—"}
+                      </div>
+                    </td>
+                    <td className="px-5 py-3.5">
+                      <Badge
+                        variant={
+                          m.type === "in"
+                            ? "success"
+                            : m.type === "out"
+                            ? "warning"
+                            : "default"
+                        }
+                      >
+                        {m.type === "in" ? "Masuk" : m.type === "out" ? "Keluar" : "Adjust"}
+                      </Badge>
+                    </td>
+                    <td className="px-5 py-3.5">
+                      <span
+                        className={cn(
+                          "font-bold",
+                          m.type === "in" ? "text-green-600" : "text-rose-600"
+                        )}
+                      >
+                        {m.type === "in" ? "+" : "−"}
+                        {m.quantity} {m.inventoryUnit}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3.5 text-xs text-slate-600">
+                      {m.reason ?? "—"}
+                    </td>
+                    <td className="px-5 py-3.5 text-xs text-slate-500 font-mono">
+                      {m.reference ?? "—"}
+                    </td>
+                    <td className="px-5 py-3.5 text-right">
+                      {m.totalCost && m.totalCost > 0 ? (
+                        <span className="font-semibold text-slate-900">
+                          Rp {m.totalCost.toLocaleString("id-ID")}
+                        </span>
+                      ) : (
+                        <span className="text-slate-400">—</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
+
+      {tab === "items" && (
+        <>
+          {/* Alerts */}
+          {lowStock.length > 0 && (
         <Card className="p-4 bg-gradient-to-br from-amber-50 to-orange-50 border-amber-200">
           <div className="flex flex-col sm:flex-row sm:items-center gap-3">
             <div className="flex items-start gap-3 flex-1 min-w-0">
@@ -359,6 +504,8 @@ export function InventoryView({ initialInventory }: { initialInventory: Inventor
           })}
         </div>
       </Card>
+        </>
+      )}
 
       {/* Create Modal */}
       <Modal

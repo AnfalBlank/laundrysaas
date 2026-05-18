@@ -1,14 +1,17 @@
 import { AppShell } from "@/components/layout/app-shell";
 import { InventoryView } from "@/components/inventory/inventory-view";
-import { listInventory } from "@/db/repositories";
+import { listInventory, listInventoryMovements } from "@/db/repositories";
 
 export const dynamic = "force-dynamic";
 
 export default async function InventoryPage() {
-  const inventory = await listInventory();
+  const [inventory, movements] = await Promise.all([
+    listInventory(),
+    listInventoryMovements({ limit: 50 }),
+  ]);
   return (
-    <AppShell title="Inventory Management" subtitle="Stok operasional laundry">
-      <InventoryView initialInventory={inventory} />
+    <AppShell title="Inventory Management" subtitle="Stok operasional & history pemakaian">
+      <InventoryView initialInventory={inventory} initialMovements={movements} />
     </AppShell>
   );
 }
