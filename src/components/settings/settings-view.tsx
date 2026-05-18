@@ -64,6 +64,7 @@ export function SettingsView({ initialTenant }: { initialTenant: InitialTenant }
   const [active, setActive] = useState("business");
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState(initialTenant);
+  const [webhookUrl, setWebhookUrl] = useState("");
 
   const handleSave = async () => {
     setSaving(true);
@@ -329,17 +330,36 @@ export function SettingsView({ initialTenant }: { initialTenant: InitialTenant }
                     onChange={(v) => setForm({ ...form, telegramBotUsername: v })}
                     placeholder="@YourLaundryBot"
                   />
+                  <div>
+                    <label className="text-sm font-semibold text-slate-700">Webhook URL</label>
+                    <p className="text-[11px] text-slate-500 mb-1">URL publik app Anda (Vercel). Contoh: https://laundrysaas.vercel.app</p>
+                    <Input
+                      value={webhookUrl}
+                      onChange={(e) => setWebhookUrl(e.target.value)}
+                      placeholder="https://your-app.vercel.app"
+                      className="font-mono text-xs"
+                    />
+                  </div>
                   <div className="flex flex-col sm:flex-row gap-2">
                     <Button
                       type="button"
                       variant="secondary"
                       size="sm"
                       onClick={async () => {
+                        if (!webhookUrl.trim()) {
+                          toast.error("Isi Webhook URL dulu", "Masukkan URL Vercel Anda di field di atas");
+                          return;
+                        }
+                        const fullUrl = webhookUrl.replace(/\/$/, "") + "/api/telegram/webhook";
                         try {
-                          const res = await fetch("/api/telegram/setup", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) });
+                          const res = await fetch("/api/telegram/setup", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ webhookUrl: fullUrl }),
+                          });
                           const data = await res.json();
                           if (data.success) {
-                            toast.success("Webhook Telegram aktif!", `URL: ${data.webhookUrl}`);
+                            toast.success("Webhook Telegram aktif!", fullUrl);
                           } else {
                             toast.error("Gagal setup webhook", data.error || JSON.stringify(data));
                           }
@@ -361,7 +381,7 @@ export function SettingsView({ initialTenant }: { initialTenant: InitialTenant }
                           if (data.webhookInfo?.url) {
                             toast.success("Webhook aktif", data.webhookInfo.url);
                           } else {
-                            toast.info("Webhook belum di-setup", "Klik 'Aktifkan Webhook' setelah simpan token");
+                            toast.info("Webhook belum di-setup", "Isi URL dan klik Aktifkan Webhook");
                           }
                         } catch {
                           toast.error("Gagal cek status");
@@ -374,12 +394,12 @@ export function SettingsView({ initialTenant }: { initialTenant: InitialTenant }
                   <div className="text-xs text-slate-500 bg-white rounded-lg p-3 border border-blue-100">
                     <strong>Cara setup:</strong>
                     <ol className="mt-1 space-y-1 list-decimal list-inside">
-                      <li>Buka @BotFather di Telegram</li>
-                      <li>Kirim /newbot → ikuti instruksi</li>
-                      <li>Copy token yang diberikan → paste di atas</li>
-                      <li>Klik <b>Simpan Channel</b> dulu</li>
-                      <li>Lalu klik <b>Aktifkan Webhook</b></li>
-                      <li>Customer chat ke bot Anda → bot auto-reply</li>
+                      <li>Buka @BotFather di Telegram → /newbot → copy token</li>
+                      <li>Paste token di field &quot;Bot Token&quot; di atas</li>
+                      <li>Klik <b>Simpan Channel</b></li>
+                      <li>Isi <b>Webhook URL</b> dengan URL Vercel Anda (tanpa /api/...)</li>
+                      <li>Klik <b>Aktifkan Webhook</b></li>
+                      <li>Chat bot Anda di Telegram → bot akan auto-reply!</li>
                     </ol>
                   </div>
                 </div>
