@@ -42,9 +42,14 @@ export async function POST(req: Request) {
 
     if (!webhookUrl) {
       return NextResponse.json(
-        { error: "Tidak bisa menentukan webhook URL. Kirim { webhookUrl: 'https://...' } di body." },
+        { error: "Tidak bisa menentukan webhook URL. Pastikan app sudah di-deploy ke HTTPS." },
         { status: 400 }
       );
+    }
+
+    // Ensure HTTPS (Telegram requires it)
+    if (!webhookUrl.startsWith("https://")) {
+      webhookUrl = webhookUrl.replace("http://", "https://");
     }
 
     // Register webhook with Telegram
@@ -73,7 +78,8 @@ export async function POST(req: Request) {
 
     return NextResponse.json(
       {
-        error: "Gagal register webhook ke Telegram",
+        error: `Gagal register webhook: ${data.description || "Unknown error"}`,
+        webhookUrl,
         telegramResponse: data,
       },
       { status: 500 }

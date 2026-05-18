@@ -339,12 +339,12 @@ export function SettingsView({ initialTenant }: { initialTenant: InitialTenant }
                           const res = await fetch("/api/telegram/setup", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) });
                           const data = await res.json();
                           if (data.success) {
-                            toast.success("Webhook Telegram aktif!", data.webhookUrl);
+                            toast.success("Webhook Telegram aktif!", `URL: ${data.webhookUrl}`);
                           } else {
-                            toast.error("Gagal setup webhook", data.error || "Unknown error");
+                            toast.error("Gagal setup webhook", data.error || JSON.stringify(data));
                           }
-                        } catch {
-                          toast.error("Gagal menghubungi server");
+                        } catch (e) {
+                          toast.error("Gagal menghubungi server", String(e));
                         }
                       }}
                     >
