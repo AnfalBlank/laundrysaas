@@ -11,7 +11,10 @@ Production:  https://[bisnis].laundryhub.id/api
 
 ## Authentication
 
-⚠️ **Saat ini**: tenant hardcoded di `lib/tenant.ts` (`tenant_laundrysukses`).
+Saat ini menggunakan **cookie-based demo auth**:
+- Cookie `laundryhub_user` berisi user ID
+- `getCurrentUser()` di `src/lib/auth.ts` resolve user dari cookie
+- Tenant ID derived dari user record
 
 🔜 **Production**: JWT Bearer token di header:
 ```
@@ -60,10 +63,9 @@ Query params:
 - `?limit=20` — items per page (default 100, max 200)
 - `?offset=0` — skip N items
 
-Or cursor-based (planned):
-- `?cursor=xxx`
+---
 
-## Endpoints
+## Core Endpoints
 
 ### `GET /api/dashboard`
 
@@ -80,9 +82,7 @@ Dashboard metrics &amp; charts data.
     "pickupPending": 1
   },
   "revenueChart": [
-    { "day": "Sen", "revenue": 0, "orders": 0 },
-    { "day": "Sel", "revenue": 0, "orders": 0 },
-    { "day": "Min", "revenue": 471000, "orders": 8 }
+    { "day": "Sen", "revenue": 0, "orders": 0 }
   ],
   "serviceBreakdown": [
     { "name": "Cuci Setrika", "value": 25, "color": "#10b981" }
@@ -94,6 +94,8 @@ Dashboard metrics &amp; charts data.
 }
 ```
 
+---
+
 ### `GET /api/orders`
 
 List orders dengan filter optional.
@@ -101,6 +103,7 @@ List orders dengan filter optional.
 **Query Params**:
 - `status` — filter by status (e.g. `WASHING`, `ALL`)
 - `limit` — default 100
+- `q` — search by invoice number atau customer name
 
 **Response**:
 
@@ -127,6 +130,43 @@ List orders dengan filter optional.
   ]
 }
 ```
+
+### `POST /api/orders`
+
+Create new order.
+
+**Request**:
+```json
+{
+  "customerId": "cst_xxx",
+  "branchId": "branch_xxx",
+  "serviceId": "svc_xxx",
+  "pickupType": "pickup",
+  "pickupAddress": "Jl. ...",
+  "weight": 5.2,
+  "notes": "Parfum lavender",
+  "isExpress": false
+}
+```
+
+**Response**: 201 Created with full order object.
+
+### `GET /api/orders/[id]`
+
+Get single order detail.
+
+### `PATCH /api/orders/[id]`
+
+Update order (status, payment status, etc).
+
+**Request**:
+```json
+{
+  "status": "WASHING"
+}
+```
+
+---
 
 ### `GET /api/customers`
 
@@ -159,6 +199,33 @@ List customers + stats.
 }
 ```
 
+### `POST /api/customers`
+
+Create customer.
+
+**Request**:
+```json
+{
+  "name": "John Doe",
+  "phone": "0812-xxxx-xxxx",
+  "address": "Jl. ..."
+}
+```
+
+### `GET /api/customers/[id]`
+
+Get customer detail with order history.
+
+### `PATCH /api/customers/[id]`
+
+Update customer (name, phone, address, notes, blacklist, tier).
+
+### `DELETE /api/customers/[id]`
+
+Delete customer (cascade).
+
+---
+
 ### `GET /api/services`
 
 List active services.
@@ -181,6 +248,8 @@ List active services.
 }
 ```
 
+---
+
 ### `GET /api/payments`
 
 Payment history + summary.
@@ -189,19 +258,7 @@ Payment history + summary.
 
 ```json
 {
-  "payments": [
-    {
-      "id": "pay_xxx",
-      "orderId": "ord_xxx",
-      "amount": 36000,
-      "method": "qris",
-      "paidAt": "...",
-      "invoice": "INV-20240517-001",
-      "customerName": "Andi Pratama",
-      "customerPhone": "0812-3456-7890",
-      "paymentStatus": "paid"
-    }
-  ],
+  "payments": [...],
   "summary": [
     { "method": "cash", "total": 180000, "count": 1 },
     { "method": "qris", "total": 66000, "count": 2 }
@@ -213,6 +270,22 @@ Payment history + summary.
 }
 ```
 
+### `POST /api/payments`
+
+Record payment.
+
+**Request**:
+```json
+{
+  "orderId": "ord_xxx",
+  "amount": 36000,
+  "method": "qris",
+  "reference": "MID-XXX"
+}
+```
+
+---
+
 ### `GET /api/pickups`
 
 Pickup tasks + driver list.
@@ -221,19 +294,7 @@ Pickup tasks + driver list.
 
 ```json
 {
-  "pickups": [
-    {
-      "id": "pck_xxx",
-      "type": "pickup",
-      "status": "scheduled",
-      "address": "Jl. Mawar 22",
-      "scheduledAt": "...",
-      "orderId": "ord_xxx",
-      "invoice": "INV-...",
-      "customerName": "Dimas Anggara",
-      "driverName": "Pak Anto"
-    }
-  ],
+  "pickups": [...],
   "drivers": [
     {
       "id": "drv_xxx",
@@ -246,6 +307,26 @@ Pickup tasks + driver list.
   ]
 }
 ```
+
+### `POST /api/pickups`
+
+Create pickup task.
+
+**Request**:
+```json
+{
+  "orderId": "ord_xxx",
+  "driverId": "drv_xxx",
+  "type": "pickup",
+  "scheduledAt": "2026-05-17T16:00:00Z"
+}
+```
+
+### `PATCH /api/pickups/[id]`
+
+Update pickup status (scheduled → ongoing → completed).
+
+---
 
 ### `GET /api/inventory`
 
@@ -268,6 +349,88 @@ List inventory items.
 }
 ```
 
+### `POST /api/inventory`
+
+Create inventory item.
+
+### `PATCH /api/inventory/[id]`
+
+Update inventory item (name, category, unit, minimumStock).
+
+### `DELETE /api/inventory/[id]`
+
+Delete inventory item (cascade movements).
+
+### `POST /api/inventory/[id]/adjust`
+
+Adjust stock (in/out).
+
+**Request**:
+```json
+{
+  "type": "out",
+  "quantity": 2.5,
+  "reason": "production",
+  "notes": "Cuci batch pagi"
+}
+```
+
+**Effect**: Updates `inventory.stock` and creates `inventory_movements` record.
+
+### `GET /api/inventory/movements`
+
+List inventory movements (history pemakaian).
+
+**Response**:
+
+```json
+{
+  "movements": [
+    {
+      "id": "mov_xxx",
+      "inventoryId": "inv_xxx",
+      "itemName": "Detergent Premium",
+      "type": "out",
+      "quantity": 2.5,
+      "unitCost": 15000,
+      "totalCost": 37500,
+      "reason": "production",
+      "reference": "ORD-001",
+      "createdAt": "..."
+    }
+  ]
+}
+```
+
+---
+
+### `GET /api/branches`
+
+List branches for current tenant.
+
+### `POST /api/branches`
+
+Create branch.
+
+**Request**:
+```json
+{
+  "name": "Cabang Selatan",
+  "address": "Jl. Raya Selatan 45",
+  "phone": "0812-xxxx-xxxx"
+}
+```
+
+### `PATCH /api/branches/[id]`
+
+Update branch.
+
+### `DELETE /api/branches/[id]`
+
+Delete branch.
+
+---
+
 ### `GET /api/whatsapp`
 
 WhatsApp templates.
@@ -289,111 +452,244 @@ WhatsApp templates.
 }
 ```
 
-## Planned Endpoints
+---
 
-### `POST /api/orders`
+## Financial Endpoints (v0.4.0)
 
-Create new order.
+### `GET /api/expenses`
 
-**Request**:
+List expenses for current tenant.
+
+**Query Params**:
+- `period` — `today`, `7d`, `30d`, `month`, `all` (default: `month`)
+
+**Response**:
+
 ```json
 {
-  "customerId": "cst_xxx",
-  "branchId": "branch_xxx",
-  "pickupType": "pickup",
-  "pickupAddress": "Jl. ...",
-  "items": [
-    { "serviceId": "svc_xxx", "qty": 5.2 }
+  "expenses": [
+    {
+      "id": "exp_xxx",
+      "title": "Bayar listrik Mei",
+      "amount": 850000,
+      "categoryId": "expcat_xxx",
+      "categoryName": "Listrik & Air",
+      "categoryColor": "#f59e0b",
+      "paymentMethod": "qris",
+      "vendor": "PLN",
+      "expenseDate": "2026-05-17T00:00:00.000Z",
+      "branchName": "Cabang Pusat"
+    }
   ],
-  "notes": "Parfum lavender"
+  "stats": {
+    "totalThisMonth": 4800000,
+    "topCategory": "Gaji & Tunjangan",
+    "average": 480000,
+    "activeCategories": 7
+  },
+  "categories": [
+    { "id": "expcat_xxx", "name": "Gaji & Tunjangan", "color": "#ef4444" }
+  ]
 }
 ```
 
-**Response**: 201 Created with full order object.
+### `POST /api/expenses`
 
-### `PATCH /api/orders/[id]/status`
-
-Update order status (used by QR scan).
-
-**Request**:
-```json
-{ "status": "WASHING" }
-```
-
-### `POST /api/payments`
-
-Record payment.
+Create expense.
 
 **Request**:
 ```json
 {
-  "orderId": "ord_xxx",
-  "amount": 36000,
-  "method": "qris",
-  "reference": "MID-XXX"
+  "title": "Bayar listrik Mei",
+  "categoryId": "expcat_xxx",
+  "amount": 850000,
+  "paymentMethod": "qris",
+  "vendor": "PLN",
+  "branchId": "branch_xxx",
+  "expenseDate": "2026-05-17",
+  "notes": ""
 }
 ```
 
-### `POST /api/pickups`
+### `PATCH /api/expenses/[id]`
 
-Create pickup task.
+Update expense.
+
+### `DELETE /api/expenses/[id]`
+
+Delete expense.
+
+---
+
+### `GET /api/reports/pnl`
+
+Income Statement (Profit &amp; Loss) report.
+
+**Query Params**:
+- `period` — `today`, `7d`, `30d`, `month`, `all` (default: `month`)
+
+**Response**:
+
+```json
+{
+  "revenue": 12500000,
+  "cogs": 1200000,
+  "grossProfit": 11300000,
+  "grossMargin": 90.4,
+  "opex": 4800000,
+  "netProfit": 6500000,
+  "netMargin": 52.0,
+  "orderCount": 156,
+  "aov": 80128,
+  "cogsRatio": 9.6,
+  "opexRatio": 38.4,
+  "expensesByCategory": [
+    { "category": "Gaji & Tunjangan", "amount": 2500000, "color": "#ef4444" }
+  ],
+  "revenueByService": [
+    { "service": "Cuci Setrika", "revenue": 5200000, "orders": 74 }
+  ]
+}
+```
+
+---
+
+### `GET /api/suppliers`
+
+List suppliers.
+
+**Response**:
+
+```json
+{
+  "suppliers": [
+    {
+      "id": "sup_xxx",
+      "name": "PT Daia Indonesia",
+      "phone": "021-xxx",
+      "email": "sales@daia.co.id",
+      "contactPerson": "Budi",
+      "isActive": true
+    }
+  ]
+}
+```
+
+### `POST /api/suppliers`
+
+Create supplier.
+
+### `PATCH /api/suppliers/[id]`
+
+Update supplier.
+
+---
+
+### `GET /api/purchase-orders`
+
+List purchase orders.
+
+**Response**:
+
+```json
+{
+  "purchaseOrders": [
+    {
+      "id": "po_xxx",
+      "poNumber": "PO-20260517-001",
+      "status": "ordered",
+      "supplierName": "PT Daia Indonesia",
+      "total": 2500000,
+      "itemCount": 5,
+      "createdAt": "..."
+    }
+  ],
+  "stats": {
+    "total": 12,
+    "pendingValue": 2500000,
+    "receivedValue": 8700000,
+    "lowStockCount": 3
+  }
+}
+```
+
+### `POST /api/purchase-orders`
+
+Create purchase order.
 
 **Request**:
 ```json
 {
-  "orderId": "ord_xxx",
-  "driverId": "drv_xxx",
-  "type": "pickup",
-  "scheduledAt": "2026-05-17T16:00:00Z"
+  "supplierId": "sup_xxx",
+  "notes": "Restock bulanan",
+  "items": [
+    { "inventoryId": "inv_xxx", "quantity": 50, "unitPrice": 15000 },
+    { "inventoryId": "inv_yyy", "quantity": 20, "unitPrice": 25000 }
+  ]
 }
 ```
 
-### `POST /api/customers`
+### `PATCH /api/purchase-orders/[id]`
 
-Create customer.
+Update PO (status change, receive).
+
+**Receive PO**:
+```json
+{
+  "action": "receive"
+}
+```
+
+Effect:
+1. Status → `received`
+2. For each item: `receivedQuantity` = `quantity`
+3. Insert `inventory_movements` type=`in` per item (with unitCost)
+4. Update `inventory.stock` += quantity per item
+
+**Cancel PO**:
+```json
+{
+  "action": "cancel"
+}
+```
+
+---
+
+### `GET /api/settings`
+
+Get tenant settings.
+
+### `PATCH /api/settings`
+
+Update tenant settings (name, logo, color, etc).
 
 **Request**:
 ```json
 {
-  "name": "John Doe",
-  "phone": "0812-xxxx-xxxx",
-  "address": "Jl. ..."
+  "name": "Laundry Sukses Jaya"
 }
 ```
 
-### `POST /api/whatsapp/send`
+---
 
-Send WhatsApp message (broadcast or individual).
+### `POST /api/auth/switch`
+
+Switch user (demo auth).
 
 **Request**:
 ```json
 {
-  "to": ["628..."],
-  "templateKey": "order_received",
-  "variables": { "customer": "Andi", "invoice": "INV-..." }
+  "userId": "usr_xxx"
 }
 ```
 
-### `POST /api/whatsapp/webhook`
+**Effect**: Sets `laundryhub_user` cookie → redirect to dashboard.
 
-Webhook endpoint untuk receive incoming WA messages dari Fonnte.
+---
 
-### `POST /api/inventory/[id]/adjust`
+## Rate Limiting (Planned)
 
-Adjust stock.
-
-**Request**:
-```json
-{
-  "delta": -2.5,
-  "reason": "production",
-  "orderId": "ord_xxx"
-}
-```
-
-## Rate Limiting
-
-🔜 Production akan apply rate limit via Upstash:
+Production akan apply rate limit via Upstash:
 
 | Tier         | Rate              |
 | ------------ | ----------------- |
@@ -402,16 +698,7 @@ Adjust stock.
 | Pro plan     | 2000 req/min      |
 | Enterprise   | Unlimited         |
 
-Header response:
-```
-X-RateLimit-Limit: 600
-X-RateLimit-Remaining: 599
-X-RateLimit-Reset: 1684328400
-```
-
-## Webhooks (Outgoing)
-
-Untuk integrate ke external systems:
+## Webhooks (Planned)
 
 ### Order Status Changed
 
@@ -439,6 +726,8 @@ POST ke `webhookUrl` (configured in Settings):
 - `payment.received`
 - `pickup.scheduled`
 - `pickup.completed`
+- `expense.created`
+- `purchase_order.received`
 
 ## Testing API
 
@@ -447,19 +736,10 @@ POST ke `webhookUrl` (configured in Settings):
 ```bash
 curl http://localhost:3000/api/dashboard
 curl "http://localhost:3000/api/orders?status=WASHING"
+curl http://localhost:3000/api/expenses
+curl "http://localhost:3000/api/reports/pnl?period=month"
+curl http://localhost:3000/api/purchase-orders
 ```
-
-### Postman / Insomnia
-
-Import collection: `docs/technical/postman-collection.json` (planned).
-
-### Integration Tests
-
-```bash
-npm run test:api
-```
-
-(Test framework belum di-setup, lihat [Testing](./testing.md).)
 
 ## Selanjutnya
 

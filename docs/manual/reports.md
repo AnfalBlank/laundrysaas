@@ -4,39 +4,44 @@ Laporan bisnis dan analitik laundry untuk decision making.
 
 ## Akses
 
-Menu: **Reports**
+Menu: **Reports** (hanya Owner)
 
-## Summary Cards (Atas Halaman)
+⚠️ **Update v0.4.0**: Modul Reports sekarang menampilkan **Income Statement (P&amp;L)** lengkap. Untuk dokumentasi detail P&amp;L, lihat [Expenses &amp; Reports](./expenses-reports.md).
 
-4 widget metric utama:
+---
 
-| Widget          | Arti                                          |
-| --------------- | --------------------------------------------- |
-| Omzet Bulan Ini | Total revenue periode dipilih                 |
-| Profit Bersih   | Revenue - estimated cost (margin 42%)         |
-| Total Order     | Jumlah order periode                          |
-| AOV             | Average Order Value (revenue / order count)   |
+## Income Statement (P&amp;L) — Fitur Utama
 
-## Filter Periode
+Reports sekarang menampilkan laporan keuangan formal:
 
-5 quick filter pills:
-- **Hari Ini**
-- **7 Hari**
-- **30 Hari** (default)
-- **Bulan Ini**
-- **Custom** — pilih date range manual
+```
+Revenue (Pendapatan)              Rp X
+(−) COGS (Cost of Goods Sold)    (Rp Y)
+═══════════════════════════════════════
+Gross Profit                      Rp X-Y    Margin Z%
+(−) Operating Expenses            (Rp W)
+═══════════════════════════════════════
+Net Profit / Net Loss             Rp Z      Margin W%
+```
 
-## Export
+### Sumber Data
 
-3 format export:
+| Komponen | Sumber |
+|---|---|
+| Revenue | Orders dengan `paymentStatus = paid` |
+| COGS | `inventory_movements` type=`out` (qty × unitCost) |
+| OPEX | Modul [Expenses](./expenses-reports.md) |
 
-| Format       | Cocok untuk                          |
-| ------------ | ------------------------------------ |
-| PDF          | Print, email ke owner, dokumentasi   |
-| Excel (xlsx) | Analisis lanjut di spreadsheet       |
-| CSV          | Import ke tools lain (BigQuery, dll) |
+### Filter Periode
 
-Klik **Export Semua** untuk semua chart + tables dalam 1 file.
+5 quick filter: Hari Ini, 7 Hari, 30 Hari, Bulan Ini, Semua.
+
+### Export
+
+- **P&amp;L PDF** — formal income statement
+- **CSV/Excel** — raw data untuk analisis lanjut
+
+Detail lengkap di [Expenses &amp; Reports → Income Statement](./expenses-reports.md#modul-reports--income-statement-pl).
 
 ## Charts
 
@@ -223,5 +228,6 @@ Prediksi peak hour besok / minggu depan untuk staffing.
 
 ## Selanjutnya
 
+- [Expenses &amp; Reports (P&amp;L)](./expenses-reports.md) — dokumentasi lengkap Income Statement
 - [Settings](./settings.md)
 - [Marketing](./marketing.md)

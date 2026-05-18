@@ -5,27 +5,30 @@ Panduan lengkap penggunaan platform LaundryHub untuk owner, admin/kasir, staff l
 ## Daftar Isi
 
 1. [Pengenalan](#1-pengenalan)
-2. [Memulai](./getting-started.md) — login, navigasi pertama
-3. [Dashboard Owner](./dashboard.md) — monitoring bisnis realtime
-4. [Manajemen Order](./orders.md) — input order, status, invoice
-5. [Pickup &amp; Delivery](./pickup-delivery.md) — jadwal jemput &amp; antar
-6. [Customer Management](./customers.md) — data, tier, loyalty
-7. [Pricing &amp; Layanan](./services.md) — atur harga
-8. [Pembayaran](./payments.md) — POS, multi-method
-9. [Inventory](./inventory.md) — stok operasional
-10. [WhatsApp Automation](./whatsapp.md) — auto-reply, broadcast
-11. [Marketing](./marketing.md) — campaign, segmentasi
-12. [Reports &amp; Analytics](./reports.md) — laporan bisnis
-13. [Staff Management](./staff.md) — kelola tim
-14. [Settings](./settings.md) — konfigurasi tenant
-15. [Customer Portal](./customer-portal.md) — tracking publik
-16. [FAQ &amp; Troubleshooting](./faq.md)
+2. [Memulai](./getting-started.md) — login, navigasi pertama, switch user
+3. **[Multi-Role &amp; Permissions](./roles.md)** — panduan per role 🆕
+4. [Dashboard](./dashboard.md) — monitoring per role
+5. [Manajemen Order](./orders.md) — input order, status, invoice
+6. [Pickup &amp; Delivery](./pickup-delivery.md) — jadwal jemput &amp; antar
+7. [Customer Management](./customers.md) — data, tier, loyalty
+8. [Pricing &amp; Layanan](./services.md) — atur harga
+9. [Pembayaran](./payments.md) — POS, multi-method
+10. **[Expenses &amp; Reports](./expenses-reports.md)** — pencatatan biaya &amp; P&amp;L 🆕
+11. [Inventory](./inventory.md) — stok operasional &amp; history pemakaian
+12. **[Purchase Orders](./purchase-orders.md)** — pemesanan ke supplier 🆕
+13. [WhatsApp Automation](./whatsapp.md) — auto-reply, broadcast
+14. [Marketing](./marketing.md) — campaign, segmentasi
+15. [Reports &amp; Analytics](./reports.md) — laporan bisnis
+16. [Staff Management](./staff.md) — kelola tim
+17. [Settings](./settings.md) — konfigurasi tenant
+18. [Customer Portal](./customer-portal.md) — tracking publik
+19. [FAQ &amp; Troubleshooting](./faq.md)
 
 ## 1. Pengenalan
 
 ### Apa itu LaundryHub?
 
-LaundryHub adalah platform ERP (Enterprise Resource Planning) berbasis SaaS yang dirancang khusus untuk bisnis laundry. Platform ini menggabungkan operasional, marketing, dan analitik dalam satu sistem terintegrasi.
+LaundryHub adalah platform ERP (Enterprise Resource Planning) berbasis SaaS yang dirancang khusus untuk bisnis laundry. Platform ini menggabungkan operasional, keuangan, marketing, dan analitik dalam satu sistem terintegrasi dengan **dashboard berbeda untuk setiap role**.
 
 ### Untuk siapa?
 
@@ -38,50 +41,49 @@ LaundryHub adalah platform ERP (Enterprise Resource Planning) berbasis SaaS yang
 
 ### Role &amp; Hak Akses
 
-| Role               | Hak Akses                                                            |
-| ------------------ | -------------------------------------------------------------------- |
-| **Owner**          | Akses penuh: dashboard, laporan, manajemen user, pengaturan, semua cabang |
-| **Admin / Kasir**  | Input order, pembayaran, customer, print invoice                     |
-| **Staff Laundry**  | Update progress laundry, scan QR, ubah status proses                 |
-| **Driver**         | Pickup task, delivery task, navigasi alamat, upload bukti foto       |
-| **Customer**       | Tracking order via portal publik, tanpa login                        |
+| Role               | Dashboard            | Hak Akses                                                    |
+| ------------------ | -------------------- | ------------------------------------------------------------ |
+| **Owner**          | Full executive       | Semua menu: Settings, Reports, Expenses, Staff, dll         |
+| **Admin / Kasir**  | Operational          | Order, customer, payment, pickup, marketing (no financial)   |
+| **Staff Laundry**  | Production Board     | Order produksi (kanban), inventory, scan QR (TODO)          |
+| **Driver**         | Task List            | Pickup &amp; delivery task, navigasi Maps                       |
+| **Customer**       | Public tracking      | Tracking order via portal, tanpa login                       |
+
+Detail di [Multi-Role &amp; Permissions](./roles.md).
 
 ### Alur Kerja Utama
 
 ```
-Customer chat WA  →  Sistem buat pickup request
+Customer chat WhatsApp  →  Sistem buat pickup request
                            ↓
                     Admin konfirmasi
                            ↓
                     Driver pickup
                            ↓
-              Staff terima &amp; proses (washing → drying → ironing → packing)
+              Staff terima &amp; proses (Diterima → Dicuci → Dikeringkan → Disetrika → Dikemas)
                            ↓
-                    Notifikasi WA otomatis ke customer
+                    Notifikasi WhatsApp otomatis ke customer
                            ↓
                     Driver delivery
                            ↓
               Customer terima &amp; bayar
+                           ↓
+              Owner lihat laporan keuangan (Reports → P&amp;L)
 ```
 
-### Navigasi Sidebar
+### Navigasi Sidebar Berdasarkan Role
 
-Menu utama yang tersedia di sidebar kiri:
+#### Owner — 14 menu
+Dashboard, Orders, Pickup, Customers, Services, Payments, **Expenses**, Reports, Inventory, **Purchase Orders**, Staff, WhatsApp, Marketing, Settings
 
-| Menu                | Fungsi                                          |
-| ------------------- | ----------------------------------------------- |
-| Dashboard           | Monitoring bisnis realtime                      |
-| Orders              | Daftar dan kelola semua order                   |
-| Pickup &amp; Delivery   | Jadwal jemput dan antar                         |
-| Customers           | Data pelanggan dan loyalty                      |
-| Services            | Pricing layanan                                 |
-| Payments            | Riwayat pembayaran                              |
-| Reports             | Laporan bisnis dan analitik                     |
-| Inventory           | Stok detergent, parfum, packaging               |
-| Staff               | Kelola tim karyawan                             |
-| WhatsApp            | Automation dan template notifikasi              |
-| Marketing           | Campaign dan segmentasi                         |
-| Settings            | Konfigurasi tenant                              |
+#### Admin / Kasir — 11 menu
+Dashboard, Orders, Pickup, Customers, Services, Payments, Inventory, **Purchase Orders**, WhatsApp, Marketing, Notifications
+
+#### Staff Laundry — 4 menu
+Dashboard (Production Board), Orders, Inventory, Notifications
+
+#### Driver — 4 menu
+Dashboard (Task List), Pickup, Orders, Notifications
 
 ## Konvensi Dokumentasi
 
@@ -89,6 +91,7 @@ Menu utama yang tersedia di sidebar kiri:
 - ⚠️ **Penting** — perhatian khusus
 - 💡 **Contoh** — skenario penggunaan
 - 🚫 **Hindari** — anti-pattern
+- 🆕 **Baru di v0.4.0**
 
 ## Bantuan
 

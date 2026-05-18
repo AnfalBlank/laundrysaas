@@ -14,7 +14,7 @@ Informasi dasar bisnis:
 
 | Field            | Keterangan                                       |
 | ---------------- | ------------------------------------------------ |
-| Nama Bisnis      | Display name di seluruh aplikasi                 |
+| Nama Bisnis      | Display name di seluruh aplikasi & sidebar       |
 | Subdomain        | URL akses (contoh: laundrysukses.laundryhub.id)  |
 | Email            | Email kontak utama                               |
 | No. WhatsApp     | Nomor utama untuk notifikasi customer            |
@@ -24,9 +24,11 @@ Informasi dasar bisnis:
 
 Klik **Simpan Perubahan** setelah edit.
 
-## 2. Cabang
+🔵 **Tip**: Nama bisnis yang disimpan di sini akan langsung ter-update di **sidebar** (tenant card) setelah save — tanpa perlu refresh manual.
 
-Manajemen multi-outlet.
+## 2. Cabang (Branches Manager)
+
+Manajemen multi-outlet via **Branches Manager** component.
 
 ### Tambah Cabang
 
@@ -37,20 +39,15 @@ Manajemen multi-outlet.
    - Phone
 3. Save
 
-### Pricing Override per Cabang
+### Edit Cabang
 
-Cabang tertentu bisa pakai harga berbeda:
-
-1. Klik **Atur** pada cabang
-2. Tab **Pricing Override**
-3. Override harga layanan tertentu
-4. Save
-
-### Inventory per Cabang
-
-Setiap cabang punya stok inventory sendiri.
+1. Klik icon **Edit** di baris cabang
+2. Update nama, alamat, phone
+3. Save
 
 ### Hapus Cabang
+
+Klik icon **Hapus** → konfirmasi.
 
 ⚠️ **Penting**: Hapus cabang akan **fail** bila masih ada order/pickup aktif. Cancel/transfer dulu.
 

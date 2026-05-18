@@ -107,7 +107,7 @@ src/
 │       └── laundry-icons.tsx  # 30+ custom 3D SVG
 │
 ├── db/
-│   ├── schema.ts              # Drizzle schema (12 tables)
+│   ├── schema.ts              # Drizzle schema (18 tables)
 │   ├── client.ts              # libSQL client
 │   ├── repositories.ts        # Query functions
 │   └── seed.ts                # Demo data
@@ -115,6 +115,9 @@ src/
 └── lib/
     ├── utils.ts               # cn(), formatCurrency(), etc
     ├── tenant.ts              # getCurrentTenantId()
+    ├── auth.ts                # getCurrentUser(), hasPermission(), canAccessPage()
+    ├── auth-types.ts          # Role type, AuthUser interface (client-safe)
+    ├── export.ts              # CSV/PDF export utilities
     └── dummy-data.ts          # UI constants (status labels)
 ```
 
@@ -185,14 +188,59 @@ Implemented via `getCurrentTenantId()` di repositories. Production akan derive d
 
 Lihat [Multi-Tenant](./multi-tenant.md) untuk detail.
 
-## Authentication (Planned)
+## Authentication &amp; RBAC
 
-Currently: hardcoded tenant via `lib/tenant.ts`.
+### Current Implementation (Demo)
 
-Production: 
-- NextAuth.js / Auth.js
+Cookie-based user switching for testing:
+
+```
+src/lib/auth.ts          — Server-only: getCurrentUser(), hasPermission(), canAccessPage()
+src/lib/auth-types.ts    — Client-safe: Role type, AuthUser interface, ROLE_LABELS
+src/app/api/auth/switch  — POST endpoint to switch user (sets cookie)
+```
+
+**Flow**:
+1. Cookie `laundryhub_user` stores user ID
+2. `getCurrentUser()` reads cookie → queries DB → returns `AuthUser`
+3. `AppShell` (server component) calls `getCurrentUser()` → passes to Sidebar/Topbar
+4. Sidebar filters menu items via `canAccessPage(role, path)`
+5. Dashboard renders role-specific component based on `user.role`
+
+### 4 Roles
+
+| Role   | Dashboard          | Menu Count | Financial Access |
+|--------|--------------------|------------|------------------|
+| owner  | Full executive     | 14         | Full             |
+| admin  | Operational        | 11         | None             |
+| staff  | Production Board   | 4          | None             |
+| driver | Task List          | 4          | None             |
+
+### Permission Matrix
+
+```typescript
+// src/lib/auth.ts
+const ROLE_PERMISSIONS = {
+  owner: ["*"],
+  admin: ["orders:*", "customers:*", "payments:*", "pickups:*", ...],
+  staff: ["orders:read", "orders:update_status", "inventory:read", "inventory:adjust"],
+  driver: ["pickups:read", "pickups:update_status", "orders:read"],
+}
+```
+
+### Limitations (Current)
+
+- API routes do NOT enforce permission checks server-side (planned)
+- No middleware blocking protected routes per role (planned)
+- Password hashing not implemented (demo uses plain text comparison)
+
+### Production Plan
+
+- NextAuth.js / Auth.js with credentials provider
+- bcrypt password hashing
 - JWT session tokens
-- Role-based access control (RBAC)
+- Middleware for route protection
+- API route guards
 - 2FA via OTP
 
 Lihat [Authentication](./authentication.md).

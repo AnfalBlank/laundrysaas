@@ -4,7 +4,9 @@ Kelola data pelanggan dan program loyalitas.
 
 ## Akses
 
-Menu: **Customers**
+Menu: **Customers** — tersedia untuk **Owner** &amp; **Admin / Kasir**.
+
+❌ Staff Laundry &amp; Driver tidak punya akses ke modul ini.
 
 ## Stats Overview
 
@@ -43,7 +45,7 @@ Cari berdasarkan nama atau nomor HP.
 
 Setiap customer ditampilkan sebagai card dengan:
 
-- Avatar 3D dengan icon sesuai tier (👑 / ⭐ / 👤)
+- Avatar 3D dengan icon sesuai tier (Crown, Star, atau User icon — non-emoji)
 - Nama + nomor HP
 - Badge tier
 - 3 metrics:
@@ -71,11 +73,11 @@ Saat customer chat ke nomor bisnis pertama kali, AI bot otomatis create customer
 
 ## Detail Customer
 
-Klik tombol **Detail** untuk masuk ke halaman customer detail dengan tab:
+Klik tombol **Detail** untuk membuka **Customer Detail Modal** dengan tab:
 
 ### Tab Histori Transaksi
 
-- Semua order pernah dibuat
+- Semua order pernah dibuat (auto-load via API)
 - Status, total, tanggal
 - Klik order → masuk ke order detail
 
@@ -95,9 +97,9 @@ Free-form notes admin tentang customer:
 
 ### Tab Settings
 
-- Edit data customer
-- Toggle blacklist (no future orders allowed)
-- Delete customer (cascade ke orders — gunakan hati-hati)
+- **Edit data customer** (nama, phone, alamat, notes)
+- Toggle **Blacklist** (no future orders allowed)
+- **Delete** customer (cascade ke orders — gunakan hati-hati)
 
 ## Loyalty Point System
 

@@ -27,6 +27,25 @@ https://app.laundrysukses.com
 
 ⚠️ **Penting**: Jangan share kredensial dengan staff lain — buatkan akun terpisah untuk setiap karyawan.
 
+## Switch User (Demo Mode)
+
+Untuk testing fitur per role tanpa logout:
+
+1. Klik **avatar profile** di pojok kanan atas
+2. Pilih **Switch User (Demo)**
+3. Modal muncul dengan list semua user aktif + badge role
+4. Klik user yang mau dicoba
+5. Halaman reload — sidebar &amp; dashboard berubah sesuai role
+
+Demo seed sudah include 5 user:
+- **Budi Santoso** — Owner
+- **Siti Rahayu** — Admin / Kasir
+- **Ahmad Fauzi** — Staff Laundry
+- **Dewi Lestari** — Staff Laundry
+- **Pak Anto** — Driver
+
+⚠️ **Note**: Fitur Switch User hanya untuk demo/testing. Production version akan pakai authentication real.
+
 ## Login Pertama: Setup Awal
 
 Setelah login pertama, lakukan setup berikut secara berurutan:
@@ -102,11 +121,25 @@ Sidebar dapat di-collapse di mobile (klik tombol menu di topbar). Di desktop, si
 
 ### Tenant Card
 
-Di bagian atas sidebar terlihat nama bisnis dan jumlah cabang aktif. Klik untuk switch tenant (jika punya akses ke beberapa).
+Di bagian atas sidebar terlihat:
+- **Nama bisnis** (auto-update saat diubah di Settings)
+- Jumlah cabang aktif
+- **Badge role** user yang sedang login (Owner / Admin / Staff / Driver)
+- Nama cabang (untuk non-Owner)
 
 ### Plan Card
 
-Di bagian bawah sidebar muncul info paket aktif. Klik **Upgrade** untuk berpindah paket.
+Di bagian bawah sidebar muncul info paket aktif (hanya tampil untuk **Owner**). Klik **Upgrade** untuk berpindah paket.
+
+### Menu Berdasarkan Role
+
+Sidebar otomatis filter menu sesuai role:
+- **Owner**: 14 menu (semua)
+- **Admin**: 11 menu (tanpa Settings, Reports, Expenses, Staff)
+- **Staff**: 4 menu (Dashboard, Orders, Inventory, Notifications)
+- **Driver**: 4 menu (Dashboard, Pickup, Orders, Notifications)
+
+Detail di [Multi-Role &amp; Permissions](./roles.md).
 
 ## Main Content
 
@@ -131,5 +164,6 @@ Klik avatar profile di topbar → pilih **Logout**.
 
 ## Selanjutnya
 
-- [Dashboard Owner](./dashboard.md) — pelajari widget &amp; metrics
+- [Multi-Role &amp; Permissions](./roles.md) — panduan per role
+- [Dashboard](./dashboard.md) — pelajari widget &amp; metrics per role
 - [Orders](./orders.md) — buat order pertama

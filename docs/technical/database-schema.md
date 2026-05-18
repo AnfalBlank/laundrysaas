@@ -1,6 +1,6 @@
 # Database Schema
 
-12 tabel dengan multi-tenant isolation via Drizzle ORM untuk Turso (libSQL).
+18 tabel dengan multi-tenant isolation via Drizzle ORM untuk Turso (libSQL).
 
 ## ERD
 
@@ -9,36 +9,48 @@
                         │ tenants  │
                         └────┬─────┘
                              │
-       ┌─────────────────────┼─────────────────────┐
-       │                     │                     │
-  ┌────▼────┐          ┌────▼─────┐          ┌────▼─────┐
-  │branches │          │  users   │          │customers │
-  └────┬────┘          └──────────┘          └────┬─────┘
-       │                                          │
-       │                                          │
-       │     ┌───────────┐                        │
-       └─────►  orders   ◄────────────────────────┘
-             └─────┬─────┘
-                   │
-       ┌───────────┼───────────┬─────────────┐
-       │           │           │             │
-  ┌────▼─────┐ ┌──▼──┐  ┌─────▼────┐  ┌────▼─────┐
-  │order_    │ │pay- │  │ pickups  │  │whatsapp_ │
-  │items     │ │ments│  └────┬─────┘  │templates │
-  └────┬─────┘ └─────┘       │        └──────────┘
-       │                     │
-   ┌───▼────┐           ┌────▼─────┐
-   │services│           │ drivers  │
-   └────────┘           └──────────┘
-
-           ┌──────────┐
-           │inventory │
-           └──────────┘
+       ┌─────────────────────┼─────────────────────────────────┐
+       │                     │                                 │
+  ┌────▼────┐          ┌────▼─────┐          ┌────▼─────┐     │
+  │branches │          │  users   │          │customers │     │
+  └────┬────┘          └──────────┘          └────┬─────┘     │
+       │                                          │           │
+       │     ┌───────────┐                        │           │
+       └─────►  orders   ◄────────────────────────┘           │
+             └─────┬─────┘                                    │
+                   │                                          │
+       ┌───────────┼───────────┬─────────────┐                │
+       │           │           │             │                │
+  ┌────▼─────┐ ┌──▼──┐  ┌─────▼────┐  ┌────▼─────┐          │
+  │order_    │ │pay- │  │ pickups  │  │whatsapp_ │          │
+  │items     │ │ments│  └────┬─────┘  │templates │          │
+  └────┬─────┘ └─────┘       │        └──────────┘          │
+       │                     │                               │
+   ┌───▼────┐           ┌────▼─────┐                         │
+   │services│           │ drivers  │                         │
+   └────────┘           └──────────┘                         │
+                                                             │
+  ┌──────────┐     ┌──────────────────┐                      │
+  │inventory │◄────│inventory_movements│                      │
+  └────┬─────┘     └──────────────────┘                      │
+       │                                                     │
+       │     ┌──────────────────┐     ┌──────────────┐       │
+       └─────│purchase_order_   │─────│purchase_     │       │
+             │items             │     │orders        │       │
+             └──────────────────┘     └──────┬───────┘       │
+                                             │               │
+                                        ┌────▼─────┐         │
+                                        │suppliers │         │
+                                        └──────────┘         │
+                                                             │
+  ┌──────────────────┐     ┌──────────────┐                  │
+  │expense_categories│─────│  expenses    │──────────────────┘
+  └──────────────────┘     └──────────────┘
 ```
 
 ## Multi-Tenant Pattern
 
-Semua tabel kecuali `tenants` dan `order_items` punya kolom `tenantId` (TEXT):
+Semua tabel kecuali `tenants`, `order_items`, dan `purchase_order_items` punya kolom `tenantId` (TEXT):
 
 ```typescript
 tenantId: text("tenant_id")
@@ -204,7 +216,7 @@ Multiple payments per order (split payment).
 | id          | TEXT PK |                                          |
 | orderId     | TEXT FK |                                          |
 | amount      | INTEGER |                                          |
-| method      | TEXT    | enum: cash / transfer / qris / ewallet   |
+| method      | TEXT    | enum: cash / transfer / qris / ewallet / other |
 | reference   | TEXT    | Bank ref, QRIS ref, dll                  |
 | paidAt      | INTEGER |                                          |
 
@@ -279,6 +291,163 @@ Template auto-reply &amp; notifikasi.
 
 **Indexes**: `tenantId`
 
+---
+
+## Tabel Baru (v0.4.0) — Financial &amp; Supply Chain
+
+### 13. `inventory_movements`
+
+Track setiap pergerakan stok — basis untuk COGS di P&amp;L.
+
+| Column          | Type    | Description                                    |
+| --------------- | ------- | ---------------------------------------------- |
+| id              | TEXT PK |                                                |
+| tenantId        | TEXT FK |                                                |
+| inventoryId     | TEXT FK | → inventory.id (cascade)                       |
+| type            | TEXT    | enum: in / out / adjustment                    |
+| quantity        | REAL    | Jumlah unit                                    |
+| unitCost        | INTEGER | Harga per unit (IDR)                           |
+| totalCost       | INTEGER | quantity × unitCost                            |
+| reason          | TEXT    | manual / restock / production / damage         |
+| reference       | TEXT    | PO number, order ID, atau free text            |
+| purchaseOrderId | TEXT    | Link ke PO (nullable)                          |
+| orderId         | TEXT    | Link ke order (nullable)                       |
+| notes           | TEXT    |                                                |
+| createdAt       | INTEGER |                                                |
+
+**Indexes**: `tenantId`, `inventoryId`, `(tenantId, type)`
+
+**Relasi**: 
+- `inventoryId` → `inventory.id` (cascade delete)
+- `purchaseOrderId` → referensi PO (soft link)
+- `orderId` → referensi order (soft link)
+
+**Use case**: 
+- Saat PO di-receive → insert movement type=`in` dengan unitCost
+- Saat staff pakai bahan → insert movement type=`out`
+- COGS = SUM(totalCost) WHERE type=`out` dalam periode
+
+### 14. `suppliers`
+
+Data supplier untuk purchase orders.
+
+| Column        | Type    | Description                              |
+| ------------- | ------- | ---------------------------------------- |
+| id            | TEXT PK |                                          |
+| tenantId      | TEXT FK |                                          |
+| name          | TEXT    | NOT NULL                                 |
+| phone         | TEXT    |                                          |
+| email         | TEXT    |                                          |
+| address       | TEXT    |                                          |
+| contactPerson | TEXT    | Nama PIC                                 |
+| notes         | TEXT    |                                          |
+| isActive      | BOOLEAN |                                          |
+| createdAt     | INTEGER |                                          |
+
+**Indexes**: `tenantId`
+
+### 15. `purchase_orders`
+
+Header purchase order ke supplier.
+
+| Column      | Type    | Description                                    |
+| ----------- | ------- | ---------------------------------------------- |
+| id          | TEXT PK |                                                |
+| tenantId    | TEXT FK |                                                |
+| supplierId  | TEXT FK | → suppliers.id (nullable)                      |
+| poNumber    | TEXT    | Format: `PO-YYYYMMDD-XXX`                      |
+| status      | TEXT    | enum: draft / ordered / partial / received / cancelled |
+| subtotal    | INTEGER |                                                |
+| discount    | INTEGER |                                                |
+| tax         | INTEGER |                                                |
+| total       | INTEGER |                                                |
+| notes       | TEXT    |                                                |
+| orderedAt   | INTEGER | Timestamp saat status → ordered                |
+| receivedAt  | INTEGER | Timestamp saat status → received               |
+| createdAt   | INTEGER |                                                |
+
+**Indexes**: `tenantId`, `(tenantId, status)`
+
+### 16. `purchase_order_items`
+
+Line items per PO.
+
+| Column           | Type    | Description                              |
+| ---------------- | ------- | ---------------------------------------- |
+| id               | TEXT PK |                                          |
+| purchaseOrderId  | TEXT FK | → purchase_orders.id (cascade)           |
+| inventoryId      | TEXT FK | → inventory.id                           |
+| itemName         | TEXT    | Snapshot nama item                       |
+| quantity         | REAL    | Qty yang dipesan                         |
+| unitPrice        | INTEGER | Harga per unit                           |
+| total            | INTEGER | quantity × unitPrice                     |
+| receivedQuantity | REAL    | Qty yang sudah diterima (default 0)      |
+
+**Indexes**: `purchaseOrderId`
+
+**Workflow**:
+1. Buat PO (status=draft) → isi items
+2. Kirim ke supplier (status=ordered)
+3. Barang datang → Receive PO:
+   - Update `receivedQuantity`
+   - Insert `inventory_movements` type=`in` per item
+   - Update `inventory.stock` += receivedQuantity
+   - Status → received (atau partial jika belum semua)
+
+### 17. `expense_categories`
+
+Kategori pengeluaran operasional.
+
+| Column   | Type    | Description                              |
+| -------- | ------- | ---------------------------------------- |
+| id       | TEXT PK |                                          |
+| tenantId | TEXT FK |                                          |
+| name     | TEXT    | NOT NULL (e.g. "Gaji &amp; Tunjangan")       |
+| icon     | TEXT    | Lucide icon name (optional)              |
+| color    | TEXT    | Hex color (default #64748b)              |
+| isActive | BOOLEAN |                                          |
+
+**Indexes**: `tenantId`
+
+**10 kategori default** (seeded):
+1. Gaji &amp; Tunjangan
+2. Sewa Tempat
+3. Listrik &amp; Air
+4. Internet &amp; Telepon
+5. Bahan Operasional
+6. Transport &amp; BBM
+7. Marketing &amp; Iklan
+8. Maintenance Mesin
+9. Pajak &amp; Retribusi
+10. Lain-lain
+
+### 18. `expenses`
+
+Pencatatan pengeluaran operasional (OPEX).
+
+| Column        | Type    | Description                                    |
+| ------------- | ------- | ---------------------------------------------- |
+| id            | TEXT PK |                                                |
+| tenantId      | TEXT FK |                                                |
+| branchId      | TEXT FK | → branches.id (nullable, untuk attribution)    |
+| categoryId    | TEXT FK | → expense_categories.id                        |
+| title         | TEXT    | NOT NULL (e.g. "Bayar listrik Mei")            |
+| amount        | INTEGER | NOT NULL (IDR)                                 |
+| paymentMethod | TEXT    | enum: cash / transfer / qris / ewallet / other |
+| vendor        | TEXT    | Nama vendor/tujuan (optional)                  |
+| receiptUrl    | TEXT    | URL foto receipt (optional)                    |
+| notes         | TEXT    |                                                |
+| expenseDate   | INTEGER | NOT NULL — tanggal pengeluaran                 |
+| createdAt     | INTEGER |                                                |
+
+**Indexes**: `tenantId`, `(tenantId, expenseDate)`, `categoryId`
+
+**Integrasi P&amp;L**: 
+- Total expenses dalam periode = Operating Expenses (OPEX) di Income Statement
+- Net Profit = Gross Profit − OPEX
+
+---
+
 ## Schema Conventions
 
 ### Primary Keys
@@ -296,6 +465,12 @@ Semua PK adalah `TEXT` dengan prefix:
 - `pck_xxx`
 - `inv_xxx`
 - `tpl_xxx`
+- `mov_xxx` (inventory movements)
+- `sup_xxx` (suppliers)
+- `po_xxx` (purchase orders)
+- `poi_xxx` (purchase order items)
+- `expcat_xxx` (expense categories)
+- `exp_xxx` (expenses)
 
 Generated via `generateId(prefix)` helper di `repositories.ts`.
 
@@ -327,17 +502,29 @@ Cascade delete diaktifkan untuk dependent data:
 .references(() => tenants.id, { onDelete: "cascade" })
 ```
 
-Hapus tenant → semua tabel terkait ikut terhapus. Hapus order → orderItems &amp; payments ikut terhapus.
+Hapus tenant → semua tabel terkait ikut terhapus. Hapus order → orderItems &amp; payments ikut terhapus. Hapus inventory → movements ikut terhapus. Hapus PO → PO items ikut terhapus.
 
 ## TypeScript Types
 
 Drizzle auto-generate types dari schema:
 
 ```typescript
+// Original 12 tables
 export type Tenant = typeof tenants.$inferSelect;
 export type NewTenant = typeof tenants.$inferInsert;
 export type Order = typeof orders.$inferSelect;
+export type NewOrder = typeof orders.$inferInsert;
+export type Customer = typeof customers.$inferSelect;
+export type NewCustomer = typeof customers.$inferInsert;
 // ... dll
+
+// New tables (v0.4.0)
+export type InventoryMovement = typeof inventoryMovements.$inferSelect;
+export type Supplier = typeof suppliers.$inferSelect;
+export type PurchaseOrder = typeof purchaseOrders.$inferSelect;
+export type PurchaseOrderItem = typeof purchaseOrderItems.$inferSelect;
+export type Expense = typeof expenses.$inferSelect;
+export type ExpenseCategory = typeof expenseCategories.$inferSelect;
 ```
 
 Used di repositories dan API layer untuk type safety end-to-end.
@@ -362,7 +549,7 @@ Generate file SQL di `drizzle/` folder. Review dulu sebelum apply.
 
 ```bash
 # Apply manually via Turso CLI
-turso db shell laundryhub-prod &lt; drizzle/0001_xxx.sql
+turso db shell laundryhub-prod < drizzle/0001_xxx.sql
 ```
 
 ⚠️ **Penting**: 
@@ -376,9 +563,13 @@ turso db shell laundryhub-prod &lt; drizzle/0001_xxx.sql
 
 Sudah ada index di columns yang sering di-filter:
 - `tenantId` (semua tabel)
-- `(tenantId, status)` di orders, pickups
+- `(tenantId, status)` di orders, pickups, purchase_orders
 - `(tenantId, phone)` di customers
 - `(tenantId, invoiceNumber)` di orders
+- `(tenantId, type)` di inventory_movements
+- `(tenantId, expenseDate)` di expenses
+- `inventoryId` di inventory_movements
+- `categoryId` di expenses
 
 ### Query Patterns
 

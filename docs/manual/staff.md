@@ -1,19 +1,21 @@
 # Staff Management
 
-Kelola tim karyawan dengan role-based access control.
+Kelola tim karyawan dengan **Role-Based Access Control (RBAC)**.
 
 ## Akses
 
 Menu: **Staff** (hanya Owner)
 
+⚠️ Lihat [Multi-Role &amp; Permissions](./roles.md) untuk detail dashboard &amp; menu setiap role.
+
 ## Role Stats (Atas Halaman)
 
 4 widget jumlah staff per role:
 
-- Owner — biasanya 1 orang
-- Admin / Kasir — per cabang
-- Staff Laundry — produksi
-- Driver — pickup &amp; delivery
+- **Owner** — biasanya 1 orang (super-admin)
+- **Admin / Kasir** — operator harian per cabang
+- **Staff Laundry** — petugas produksi
+- **Driver** — pickup &amp; delivery
 
 ## Tambah Staff Baru
 
@@ -22,58 +24,55 @@ Menu: **Staff** (hanya Owner)
    - **Nama** lengkap
    - **Email** — untuk login (harus unik per tenant)
    - **No. HP**
-   - **Role** — Owner / Admin / Staff / Driver
+   - **Role** — Owner / Admin / Staff Laundry / Driver
    - **Cabang** — assignment cabang
    - **Password** — minimal 8 karakter
 3. Klik **Simpan**
 
-Sistem otomatis kirim welcome email dengan kredensial.
+⚠️ **Penting**: Saat staff dengan role `driver` dibuat, sistem otomatis create entry di tabel `drivers` sehingga driver bisa di-assign ke pickup/delivery task.
 
-## Hak Akses per Role
+## Test Switch User (Demo)
 
-### Owner
+Untuk testing fitur per role tanpa logout:
 
-✅ Semua menu  
-✅ Semua cabang  
-✅ Settings  
-✅ Reports lengkap  
-✅ Manage staff  
-✅ Manage tenant settings  
+1. Klik avatar profile di pojok kanan atas
+2. Klik **Switch User (Demo)**
+3. Pilih user dengan role yang mau dicoba
+4. Sistem reload — sidebar &amp; dashboard ikut berubah sesuai role
 
-### Admin / Kasir
+🔵 **Tip**: Demo seed sudah include 5 user dengan role berbeda (1 Owner, 1 Admin, 2 Staff, 1 Driver). Switch antar mereka untuk lihat perbedaan UI.
 
-✅ Orders (CRUD)  
-✅ Customers (CRUD)  
-✅ Payments (input)  
-✅ Pickup &amp; Delivery (assign)  
-✅ Reports (read-only, hanya cabangnya)  
-✅ Print invoice  
-❌ Settings  
-❌ Staff management  
-❌ Cross-branch reports  
+## Hak Akses per Role (Ringkasan)
 
-### Staff Laundry
+### 👑 Owner — 14 menu
 
-✅ Update order status (scan QR)  
-✅ Lihat order yang assigned ke cabang  
-✅ Inventory (stok keluar/masuk untuk cabangnya)  
-❌ Tidak bisa input order baru  
-❌ Tidak bisa lihat finansial  
+✅ Semua menu termasuk **Settings, Reports (P&amp;L), Expenses, Staff, Purchase Orders**  
+✅ Akses semua cabang  
+✅ Manage staff &amp; tenant config  
 
-### Driver
+### 👔 Admin / Kasir — 11 menu
 
-✅ Lihat task pickup &amp; delivery yang di-assign  
-✅ Update status pickup/delivery  
-✅ Upload bukti foto  
-✅ Navigation (Google Maps)  
-❌ Tidak bisa lihat data lain  
+✅ Orders, Customers, Payments, Pickup, Services, Inventory, Purchase Orders, WhatsApp, Marketing  
+❌ **Tidak ada Settings, Reports, Expenses, Staff** (no financial detail)  
+
+### 🧺 Staff Laundry — 4 menu
+
+✅ Dashboard (Production Board kanban), Orders (read + update status), Inventory (stok keluar/masuk), Notifications  
+❌ Tidak bisa input order baru, tidak lihat finansial  
+
+### 🛵 Driver — 4 menu
+
+✅ Dashboard (Task List filter by name), Pickup, Orders (read), Notifications  
+❌ Hanya lihat task yang di-assign ke driver tersebut  
+
+Detail lengkap di [Multi-Role &amp; Permissions](./roles.md).
 
 ## Detail Staff Card
 
 Setiap staff ditampilkan sebagai card dengan:
 - Avatar 3D (warna sesuai role)
-- Nama + status indicator (hijau = active)
-- Badge role
+- Nama + status indicator (hijau = active, abu = inactive)
+- **Badge role** (color-coded)
 - Cabang assignment
 - Phone &amp; Email
 
@@ -81,7 +80,7 @@ Setiap staff ditampilkan sebagai card dengan:
 
 Klik card staff → **Edit**:
 - Update nama, email, phone
-- Ganti role
+- **Ganti role** — efektif setelah staff login ulang
 - Pindah cabang
 - Reset password (admin force-reset)
 - Toggle active/inactive
@@ -90,12 +89,12 @@ Klik card staff → **Edit**:
 
 | Action          | Effect                                              |
 | --------------- | --------------------------------------------------- |
-| **Deactivate**  | Login blocked, data tetap di system                 |
-| **Delete**      | Hapus permanen (cascade ke order references)        |
+| **Deactivate**  | Login blocked, data tetap di system, history aman   |
+| **Delete**      | Hapus permanen (cascade — bisa break referensi)     |
 
 ⚠️ **Penting**: Selalu **deactivate** untuk staff resign. Jangan delete kecuali yakin tidak butuh history.
 
-## Audit Log
+## Audit Log (Planned)
 
 Setiap aksi staff terekam di Audit Log:
 - Login / logout
@@ -104,7 +103,7 @@ Setiap aksi staff terekam di Audit Log:
 - Customer changes
 - Settings changes
 
-Akses: Settings → Audit Log (Owner only)
+Akses: Settings → Audit Log (Owner only).
 
 ## Performance Tracking
 
@@ -121,22 +120,20 @@ Metrics:
 ### Per Staff Laundry
 
 Metrics:
-- Order processed per hari
-- Avg time per status
+- Order processed per hari (count Production Board flow-through)
+- Avg time per status (RECEIVED → PACKING)
 - Quality issue reported
 
 ### Per Driver
 
 Metrics:
-- Task completed
+- Task completed per hari
 - Avg pickup time
 - Avg delivery time
 - Customer rating
 - On-time rate
 
-## Schedule / Shift Management
-
-(Phase 3 feature)
+## Schedule / Shift Management (Planned)
 
 Settings → Schedule:
 - Set shift (pagi 07-14, siang 14-21)
@@ -153,11 +150,13 @@ Day 1:
 - Akun dibuat dengan role yang tepat
 - Welcome email dengan kredensial
 - Tour aplikasi via screen-share dengan admin senior
+- Login pertama, force change password
 - Dummy task untuk practice
 
 Day 2-3:
 - Shadowing senior staff
 - Test-run real task dengan supervisor
+- Belajar SOP per role
 
 Day 7:
 - Full ownership
@@ -169,7 +168,7 @@ Day 7:
 - Min 8 karakter
 - Mix huruf besar, kecil, angka, simbol
 - Force change setiap 90 hari (Settings → Security)
-- 2FA enabled untuk Owner &amp; Admin
+- 2FA enabled untuk Owner &amp; Admin (planned)
 
 ### Pindah Cabang
 
@@ -206,9 +205,9 @@ Edit staff → ganti cabang → save. Real-time effect.
 
 ```
 1. Staff → kontak admin
-2. Admin → buka detail staff → Reset Password
+2. Owner buka Staff → detail staff → Reset Password
 3. Sistem generate password sementara
-4. Send via email staff
+4. Send via email/SMS staff
 5. Staff login → force change password
 ```
 
@@ -221,7 +220,18 @@ Edit staff → ganti cabang → save. Real-time effect.
 4. Setup pricing override per cabang bila perlu
 ```
 
+### Promote Staff Laundry → Admin
+
+```
+1. Edit staff
+2. Ganti Role: staff → admin
+3. Save
+4. Staff logout/login
+5. Sidebar otomatis update (4 menu → 11 menu)
+```
+
 ## Selanjutnya
 
+- [Multi-Role &amp; Permissions](./roles.md) — detail per role
 - [Settings](./settings.md)
-- [Reports](./reports.md)
+- [Reports](./expenses-reports.md)

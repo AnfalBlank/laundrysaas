@@ -4,7 +4,16 @@ Modul utama untuk mengelola seluruh transaksi laundry — dari input hingga sele
 
 ## Akses
 
-Menu: **Orders**
+Menu: **Orders** — tersedia untuk **semua role** (Owner, Admin, Staff, Driver), dengan permission berbeda:
+
+| Role | Akses |
+|---|---|
+| Owner | Full CRUD |
+| Admin / Kasir | Full CRUD + input order baru |
+| Staff Laundry | Read + update status (via Production Board atau modal) |
+| Driver | Read order detail saja (untuk konfirmasi pickup/delivery) |
+
+⚠️ Lihat [Multi-Role &amp; Permissions](./roles.md).
 
 ## 11 Status Order
 
@@ -102,7 +111,13 @@ Klik icon filter (next to search). Filter berdasarkan:
 3. Pilih status baru
 4. Klik **Update**
 
-### Cara 2: Scan QR Code
+### Cara 2: Production Board (Staff Laundry)
+
+Staff Laundry punya **Dashboard kanban** dengan 5 kolom (RECEIVED → WASHING → DRYING → IRONING → PACKING). Klik **"Next →"** di card untuk pindah status.
+
+Lihat [Dashboard Staff](./dashboard.md#dashboard-staff-laundry--production-board).
+
+### Cara 3: Scan QR Code (Planned)
 
 Untuk update massal di area produksi:
 
