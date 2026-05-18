@@ -49,9 +49,13 @@ const navItems: NavItem[] = [
 interface SidebarProps {
   open: boolean;
   onClose: () => void;
+  tenant?: {
+    name: string;
+    branchCount: number;
+  };
 }
 
-export function Sidebar({ open, onClose }: SidebarProps) {
+export function Sidebar({ open, onClose, tenant }: SidebarProps) {
   const pathname = usePathname();
 
   // Lock body scroll only on mobile when drawer is open
@@ -117,9 +121,11 @@ export function Sidebar({ open, onClose }: SidebarProps) {
             </div>
             <div className="flex-1 min-w-0">
               <div className="text-xs font-semibold text-slate-900 truncate">
-                Laundry Sukses
+                {tenant?.name ?? "LaundryHub"}
               </div>
-              <div className="text-[11px] text-slate-500 truncate">3 cabang aktif</div>
+              <div className="text-[11px] text-slate-500 truncate">
+                {tenant?.branchCount ?? 0} cabang aktif
+              </div>
             </div>
           </div>
         </div>
