@@ -54,7 +54,7 @@ export function CustomersView({
   stats,
 }: {
   initialCustomers: CustomerRow[];
-  stats: { total: number; vip: number };
+  stats: { total: number; vip: number; repeatRate: number; inactive30Days: number };
 }) {
   const router = useRouter();
   const toast = useToast();
@@ -170,8 +170,10 @@ export function CustomersView({
             <div className="text-[10px] sm:text-xs text-slate-500 uppercase tracking-wide truncate">
               Repeat Order
             </div>
-            <div className="text-xl sm:text-2xl font-bold text-slate-900 mt-1">68%</div>
-            <div className="text-[11px] text-green-600 font-semibold mt-1">+4% MoM</div>
+            <div className="text-xl sm:text-2xl font-bold text-slate-900 mt-1">{stats.repeatRate}%</div>
+            <div className="text-[11px] text-green-600 font-semibold mt-1">
+              {stats.repeatRate >= 50 ? "Bagus" : "Perlu ditingkatkan"}
+            </div>
           </div>
           <div className="shrink-0 scale-75 sm:scale-100 origin-top-right">
             <Icon3D variant="green" size="lg">
@@ -184,7 +186,7 @@ export function CustomersView({
             <div className="text-[10px] sm:text-xs text-slate-500 uppercase tracking-wide truncate">
               Inactive 30 hari
             </div>
-            <div className="text-xl sm:text-2xl font-bold text-slate-900 mt-1">142</div>
+            <div className="text-xl sm:text-2xl font-bold text-slate-900 mt-1">{stats.inactive30Days}</div>
             <div className="text-[11px] text-red-600 font-semibold mt-1">Perlu retensi</div>
           </div>
           <div className="shrink-0 scale-75 sm:scale-100 origin-top-right">

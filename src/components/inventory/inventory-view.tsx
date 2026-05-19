@@ -43,6 +43,7 @@ interface InventoryItem {
 
 interface Movement {
   id: string;
+  inventoryId: string;
   type: string;
   quantity: number;
   unitCost: number | null;
@@ -336,9 +337,9 @@ export function InventoryView({
             <Button
               className="shrink-0 sm:self-center"
               type="button"
-              onClick={() =>
-                toast.info("Buat Order Pembelian", "Fitur ini akan segera tersedia")
-              }
+              onClick={() => {
+                window.location.href = "/purchase-orders";
+              }}
             >
               <Truck size={14} /> Buat Order
             </Button>
@@ -348,32 +349,60 @@ export function InventoryView({
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mt-4 sm:mt-5">
-        {[
-          {
-            label: "Total Item",
-            value: initialInventory.length.toString(),
-            icon: <Package3D className="w-9 h-9" />,
-            v: "blue" as const,
-          },
-          {
-            label: "Perlu Restock",
-            value: lowStock.length.toString(),
-            icon: <AlertWarning3D className="w-9 h-9" />,
-            v: "amber" as const,
-          },
-          {
-            label: "Order Bulan Ini",
-            value: "12",
-            icon: <CartIcon3D className="w-9 h-9" />,
-            v: "cyan" as const,
-          },
-          {
-            label: "Nilai Stok",
-            value: "Rp 8.4 Jt",
-            icon: <Money3D className="w-9 h-9" />,
-            v: "green" as const,
-          },
-        ].map((s) => (
+        {(() => {
+          // Compute total stock value (sum of stock × avg unit cost from movements)
+          // Fallback simple: sum of stock × 0 if no movements yet
+          const totalStockValue = initialInventory.reduce((sum, item) => {
+            // If movements exist for this item, use latest unit cost
+            const itemMoves = initialMovements.filter((m) => m.inventoryId === item.id && m.unitCost && m.unitCost > 0);
+            const avgCost =
+              itemMoves.length > 0
+                ? itemMoves.reduce((s, m) => s + (m.unitCost ?? 0), 0) / itemMoves.length
+                : 0;
+            return sum + item.stock * avgCost;
+          }, 0);
+
+          // Count purchase orders created this month (movements with type=in this month)
+          const startOfMonth = new Date();
+          startOfMonth.setDate(1);
+          startOfMonth.setHours(0, 0, 0, 0);
+          const movementsThisMonth = initialMovements.filter(
+            (m) => m.type === "in" && new Date(m.createdAt) >= startOfMonth
+          ).length;
+
+          const formatRupiah = (n: number) => {
+            if (n >= 1_000_000) return `Rp ${(n / 1_000_000).toFixed(1)} Jt`;
+            if (n >= 1_000) return `Rp ${(n / 1_000).toFixed(0)}rb`;
+            return `Rp ${n.toLocaleString("id-ID")}`;
+          };
+
+          return [
+            {
+              label: "Total Item",
+              value: initialInventory.length.toString(),
+              icon: <Package3D className="w-9 h-9" />,
+              v: "blue" as const,
+            },
+            {
+              label: "Perlu Restock",
+              value: lowStock.length.toString(),
+              icon: <AlertWarning3D className="w-9 h-9" />,
+              v: "amber" as const,
+            },
+            {
+              label: "Stok Masuk Bulan Ini",
+              value: movementsThisMonth.toString(),
+              icon: <CartIcon3D className="w-9 h-9" />,
+              v: "cyan" as const,
+            },
+            {
+              label: "Nilai Stok",
+              value: totalStockValue > 0 ? formatRupiah(totalStockValue) : "—",
+              icon: <Money3D className="w-9 h-9" />,
+              v: "green" as const,
+            },
+          ];
+        })().map((s) => (
           <Card key={s.label} className="p-4 sm:p-5 flex items-center justify-between gap-2">
             <div className="min-w-0">
               <div className="text-[10px] sm:text-xs text-slate-500 uppercase tracking-wide truncate">

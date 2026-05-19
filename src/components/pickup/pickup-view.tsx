@@ -171,6 +171,21 @@ export function PickupView({
     window.open(url, "_blank");
   };
 
+  // Compute average pickup duration from completed pickups
+  const completedPickups = initialPickups.filter(
+    (p) => p.status === "completed" && p.completedAt && p.scheduledAt
+  );
+  const avgMinutes =
+    completedPickups.length > 0
+      ? Math.round(
+          completedPickups.reduce((sum, p) => {
+            const start = new Date(p.scheduledAt!).getTime();
+            const end = new Date(p.completedAt!).getTime();
+            return sum + (end - start) / 60000;
+          }, 0) / completedPickups.length
+        )
+      : 0;
+
   return (
     <>
       {/* Quick stats */}
@@ -196,7 +211,7 @@ export function PickupView({
           },
           {
             label: "Rata² Waktu",
-            value: "24 mnt",
+            value: avgMinutes > 0 ? `${avgMinutes} mnt` : "—",
             icon: <ClockFast3D className="w-9 h-9" />,
             variant: "amber" as const,
           },

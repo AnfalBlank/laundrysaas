@@ -100,10 +100,37 @@ export function WhatsappView({ templates, channel = "whatsapp" }: { templates: T
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="secondary" className="flex-1 md:flex-none">
+          <Button
+            variant="secondary"
+            className="flex-1 md:flex-none"
+            onClick={() => {
+              const sample = isWhatsApp ? "+62 812-xxxx-xxxx" : "Telegram chat ID";
+              const dest = window.prompt(`Test kirim ke ${sample}:`);
+              if (!dest) return;
+              fetch("/api/messaging/send", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  to: dest,
+                  text: `Halo! Ini test pesan dari ${channelLabel} bot LaundryHub.`,
+                }),
+              })
+                .then((r) => r.json())
+                .then((data) => {
+                  if (data.success) alert("Pesan terkirim ✅");
+                  else alert("Gagal kirim: " + (data.error || "Unknown"));
+                })
+                .catch(() => alert("Error connecting to server"));
+            }}
+          >
             Test Kirim
           </Button>
-          <Button className="flex-1 md:flex-none">
+          <Button
+            className="flex-1 md:flex-none"
+            onClick={() => {
+              window.location.href = "/marketing";
+            }}
+          >
             <Megaphone size={16} />
             <span className="hidden sm:inline">Broadcast Baru</span>
             <span className="sm:hidden">Broadcast</span>
@@ -192,6 +219,19 @@ export function WhatsappView({ templates, channel = "whatsapp" }: { templates: T
                       type="checkbox"
                       className="sr-only peer"
                       defaultChecked={t.isActive}
+                      onChange={async (e) => {
+                        const newState = e.target.checked;
+                        try {
+                          await fetch(`/api/whatsapp/templates/${t.id}`, {
+                            method: "PATCH",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ isActive: newState }),
+                          });
+                        } catch {
+                          // revert on error
+                          e.target.checked = !newState;
+                        }
+                      }}
                     />
                     <div className="w-9 h-5 bg-slate-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:bg-gradient-to-br peer-checked:from-primary-500 peer-checked:to-accent-500 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all" />
                   </label>

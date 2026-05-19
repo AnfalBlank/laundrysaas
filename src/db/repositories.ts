@@ -224,9 +224,37 @@ export async function getCustomerStats() {
     .from(customers)
     .where(and(eq(customers.tenantId, tenantId), eq(customers.tier, "platinum")));
 
+  // Repeat order rate: customers with totalOrders > 1 / total customers
+  const [repeat] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(customers)
+    .where(and(eq(customers.tenantId, tenantId), sql`${customers.totalOrders} > 1`));
+
+  // Inactive 30 days: customers whose last order > 30 days ago
+  const thirtyDaysAgo = Math.floor((Date.now() - 30 * 24 * 60 * 60 * 1000) / 1000);
+  const [inactiveRow] = await db
+    .select({ count: sql<number>`count(distinct ${customers.id})` })
+    .from(customers)
+    .leftJoin(orders, eq(orders.customerId, customers.id))
+    .where(
+      and(
+        eq(customers.tenantId, tenantId),
+        sql`${customers.id} NOT IN (
+          SELECT DISTINCT customer_id FROM orders
+          WHERE tenant_id = ${tenantId} AND created_at >= ${thirtyDaysAgo}
+        )`
+      )
+    );
+
+  const totalCount = Number(total?.count ?? 0);
+  const repeatCount = Number(repeat?.count ?? 0);
+  const repeatRate = totalCount > 0 ? Math.round((repeatCount / totalCount) * 100) : 0;
+
   return {
-    total: Number(total?.count ?? 0),
+    total: totalCount,
     vip: Number(vip?.count ?? 0),
+    repeatRate,
+    inactive30Days: Number(inactiveRow?.count ?? 0),
   };
 }
 
@@ -486,6 +514,23 @@ export async function createOrder(input: {
     total,
   });
 
+  // Send notification to customer (order received) — best-effort
+  try {
+    const { notifyCustomer } = await import("@/lib/notify");
+    await notifyCustomer({
+      tenantId,
+      customerId,
+      templateKey: "order_received",
+      variables: {
+        invoice: invoiceNumber,
+        total: total.toLocaleString("id-ID"),
+        estimated: estimatedAt.toLocaleDateString("id-ID", { day: "numeric", month: "long" }),
+      },
+    });
+  } catch (e) {
+    console.error("Failed to send order_received notification:", e);
+  }
+
   return { id: orderId, invoiceNumber, total };
 }
 
@@ -500,6 +545,60 @@ export async function updateOrderStatus(orderId: string, status: string) {
       ...(status === "COMPLETED" ? { completedAt: new Date() } : {}),
     })
     .where(and(eq(orders.id, orderId), eq(orders.tenantId, tenantId)));
+
+  // Update customer loyalty when order completes
+  if (status === "COMPLETED") {
+    const [order] = await db
+      .select({ customerId: orders.customerId, total: orders.total, paymentStatus: orders.paymentStatus })
+      .from(orders)
+      .where(eq(orders.id, orderId))
+      .limit(1);
+    if (order && order.paymentStatus === "paid") {
+      await updateCustomerLoyalty(order.customerId, order.total);
+    }
+  }
+
+  // Send notification to customer (best-effort, don't fail order update if notif fails)
+  try {
+    const { notifyOrderStatusChange } = await import("@/lib/notify");
+    await notifyOrderStatusChange(orderId, status);
+  } catch (e) {
+    console.error("Failed to send status notification:", e);
+  }
+}
+
+/**
+ * Update customer denormalized stats: totalOrders, totalSpending, points, tier.
+ */
+async function updateCustomerLoyalty(customerId: string, orderTotal: number) {
+  const [c] = await db
+    .select()
+    .from(customers)
+    .where(eq(customers.id, customerId))
+    .limit(1);
+  if (!c) return;
+
+  const newTotalOrders = (c.totalOrders ?? 0) + 1;
+  const newTotalSpending = (c.totalSpending ?? 0) + orderTotal;
+  // 1 point per Rp 1.000
+  const earnedPoints = Math.floor(orderTotal / 1000);
+  const newPoints = (c.points ?? 0) + earnedPoints;
+
+  // Auto-tier
+  let newTier: "silver" | "gold" | "platinum" = c.tier as "silver" | "gold" | "platinum";
+  if (newTotalSpending >= 2000000) newTier = "platinum";
+  else if (newTotalSpending >= 500000) newTier = "gold";
+  else newTier = "silver";
+
+  await db
+    .update(customers)
+    .set({
+      totalOrders: newTotalOrders,
+      totalSpending: newTotalSpending,
+      points: newPoints,
+      tier: newTier,
+    })
+    .where(eq(customers.id, customerId));
 }
 
 // Cancel order
@@ -530,7 +629,7 @@ export async function recordPayment(input: {
     .where(eq(payments.orderId, input.orderId));
 
   const [order] = await db
-    .select({ total: orders.total })
+    .select({ total: orders.total, customerId: orders.customerId, invoiceNumber: orders.invoiceNumber, tenantId: orders.tenantId })
     .from(orders)
     .where(eq(orders.id, input.orderId));
 
@@ -541,6 +640,24 @@ export async function recordPayment(input: {
     .update(orders)
     .set({ paymentStatus: status, updatedAt: new Date() })
     .where(eq(orders.id, input.orderId));
+
+  // Notify customer of payment received (best-effort)
+  if (status === "paid") {
+    try {
+      const { notifyCustomer } = await import("@/lib/notify");
+      await notifyCustomer({
+        tenantId: order.tenantId,
+        customerId: order.customerId,
+        templateKey: "payment_received",
+        variables: {
+          invoice: order.invoiceNumber,
+          amount: input.amount.toLocaleString("id-ID"),
+        },
+      });
+    } catch (e) {
+      console.error("Failed to send payment notification:", e);
+    }
+  }
 
   return { id: payId };
 }
@@ -610,11 +727,18 @@ export async function createPickup(input: {
   return { id };
 }
 
-// Update pickup status
+// Update pickup status — also syncs corresponding order status
 export async function updatePickupStatus(
   pickupId: string,
   status: "scheduled" | "ongoing" | "completed" | "cancelled"
 ) {
+  // Get pickup info first
+  const [pickup] = await db
+    .select({ orderId: pickups.orderId, type: pickups.type })
+    .from(pickups)
+    .where(eq(pickups.id, pickupId))
+    .limit(1);
+
   await db
     .update(pickups)
     .set({
@@ -622,6 +746,23 @@ export async function updatePickupStatus(
       ...(status === "completed" ? { completedAt: new Date() } : {}),
     })
     .where(eq(pickups.id, pickupId));
+
+  // Sync order status based on pickup type & status
+  if (pickup) {
+    let newOrderStatus: string | null = null;
+
+    if (pickup.type === "pickup") {
+      if (status === "ongoing") newOrderStatus = "PICKUP_PROCESS";
+      else if (status === "completed") newOrderStatus = "RECEIVED";
+    } else if (pickup.type === "delivery") {
+      if (status === "ongoing") newOrderStatus = "DELIVERING";
+      else if (status === "completed") newOrderStatus = "COMPLETED";
+    }
+
+    if (newOrderStatus) {
+      await updateOrderStatus(pickup.orderId, newOrderStatus);
+    }
+  }
 }
 
 // Adjust inventory stock
@@ -955,6 +1096,7 @@ export async function listInventoryMovements(opts?: {
   return db
     .select({
       id: inventoryMovements.id,
+      inventoryId: inventoryMovements.inventoryId,
       type: inventoryMovements.type,
       quantity: inventoryMovements.quantity,
       unitCost: inventoryMovements.unitCost,
