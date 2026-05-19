@@ -25,7 +25,17 @@ Banner alert kuning di tengah:
 
 > **N order menunggu · Rp X.XXX.XXX**
 
-Klik **Kirim Reminder** untuk auto-blast WhatsApp ke customer yang belum bayar.
+Klik **Kirim Reminder** untuk auto-blast notifikasi ke customer yang belum bayar via channel aktif (WhatsApp/Telegram).
+
+### Cara Kerja Payment Reminder
+
+1. Klik tombol **Kirim Reminder** di banner outstanding
+2. Sistem ambil semua order dengan status `unpaid`
+3. Kirim pesan reminder ke masing-masing customer via channel aktif
+4. Notifikasi berisi: nama customer, nomor invoice, total tagihan
+5. Toast konfirmasi muncul: "Reminder terkirim ke N customer"
+
+🔵 **Tip**: Gunakan fitur ini di akhir minggu untuk mengingatkan customer yang belum bayar. Jangan terlalu sering agar tidak mengganggu.
 
 ## Riwayat Transaksi
 
@@ -110,15 +120,34 @@ Manual print: di order detail → klik **Print Receipt**.
 
 ## Refund
 
-1. Buka payment di Riwayat Transaksi
-2. Klik **⋯ → Refund**
-3. Pilih:
-   - **Full Refund** — kembalikan semua nominal
-   - **Partial Refund** — input nominal yang di-refund
-4. Pilih metode refund (cash / transfer balik / kredit ke saldo customer)
-5. Konfirmasi
+Refund mencatat pengembalian dana sebagai **payment record negatif** (amount minus).
 
-Refund tercatat sebagai negative payment.
+### Cara Refund
+
+1. Buka halaman **Payments**
+2. Di tabel Riwayat Transaksi, cari pembayaran yang akan di-refund
+3. Klik tombol **Refund** di kolom aksi
+4. Konfirmasi refund
+5. Sistem otomatis:
+   - Buat record payment baru dengan amount **negatif** (contoh: -Rp 35.000)
+   - Update `paymentStatus` order menjadi `unpaid` atau `partial`
+   - Catat di history
+
+### Catatan Penting
+
+- Refund tercatat sebagai negative payment di database
+- Total revenue di laporan akan berkurang sesuai refund
+- Refund tidak menghapus record pembayaran asli — keduanya tetap visible di history
+- Metode pengembalian (cash/transfer) dicatat di field reference
+
+### Contoh
+
+```
+Payment asli:  +Rp 100.000 (QRIS, 17 Mei)
+Refund:        -Rp 100.000 (Refund, 19 Mei)
+Net:            Rp 0
+Order status:   unpaid
+```
 
 ## Reconciliation
 

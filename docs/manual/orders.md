@@ -70,9 +70,56 @@ Sistem otomatis:
 
 ### Multi-Item Order
 
-Satu order bisa punya beberapa item layanan berbeda. Klik **+ Tambah Layanan** di form input.
+Satu order bisa punya beberapa item layanan berbeda:
+
+1. Di form order, klik **+ Tambah Layanan**
+2. Pilih layanan tambahan dari dropdown
+3. Input berat/qty untuk item tersebut
+4. Ulangi untuk item lainnya
+5. Subtotal per item dihitung otomatis
+6. Grand total = sum semua item
 
 💡 **Contoh**: Customer bawa 5kg cuci setrika + 2 pasang sepatu + 1 bed cover dalam satu order.
+
+Setiap item tersimpan di tabel `order_items` dengan snapshot harga saat order dibuat — perubahan harga layanan di kemudian hari tidak mempengaruhi order lama.
+
+### Diskon
+
+Field diskon tersedia di form order:
+
+1. Input nominal diskon (Rp) di field **Diskon**
+2. Diskon dikurangi dari subtotal
+3. Kalkulasi: `Total = Subtotal − Diskon + Express Surcharge`
+
+🔵 **Tip**: Diskon bisa digunakan untuk voucher, promo member, atau negosiasi harga B2B.
+
+### Express Surcharge (+50%)
+
+Bila toggle **Express** diaktifkan:
+
+- Sistem otomatis menambah surcharge **+50%** dari subtotal
+- Estimasi selesai dipercepat (biasanya 1 hari vs 2-3 hari)
+- Kalkulasi: `Express Surcharge = Subtotal × 50%`
+
+**Contoh kalkulasi**:
+```
+Subtotal:          Rp 100.000
+Diskon:           -Rp  10.000
+Express (+50%):   +Rp  50.000
+─────────────────────────────
+Total:             Rp 140.000
+```
+
+### Refund Order
+
+Bila customer minta refund setelah pembayaran:
+
+1. Buka order detail
+2. Di bagian pembayaran, klik **Refund**
+3. Sistem buat record payment negatif
+4. Payment status order di-update sesuai sisa
+
+Lihat detail di [Payments → Refund](./payments.md#refund).
 
 ## Filter &amp; Search
 

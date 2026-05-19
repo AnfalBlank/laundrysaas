@@ -1,6 +1,6 @@
 # Database Schema
 
-18 tabel dengan multi-tenant isolation via Drizzle ORM untuk Turso (libSQL).
+22 tabel dengan multi-tenant isolation via Drizzle ORM untuk Turso (libSQL).
 
 ## ERD
 
@@ -46,6 +46,18 @@
   ┌──────────────────┐     ┌──────────────┐                  │
   │expense_categories│─────│  expenses    │──────────────────┘
   └──────────────────┘     └──────────────┘
+
+  ┌──────────────────────────────────────────────────────────┐
+  │              New Tables (v0.5.0)                          │
+  │                                                          │
+  │  ┌─────────────┐  ┌──────────┐  ┌───────────────────┐   │
+  │  │notifications│  │campaigns │  │     messages      │   │
+  │  └─────────────┘  └──────────┘  └───────────────────┘   │
+  │                                                          │
+  │  ┌───────────────────────────┐                           │
+  │  │tenant_security_settings   │                           │
+  │  └───────────────────────────┘                           │
+  └──────────────────────────────────────────────────────────┘
 ```
 
 ## Multi-Tenant Pattern
@@ -66,17 +78,22 @@ Setiap query di repositories selalu filter `WHERE tenant_id = ?`. Cascade delete
 
 SaaS-level tenant info.
 
-| Column         | Type      | Constraints           | Description                          |
-| -------------- | --------- | --------------------- | ------------------------------------ |
-| id             | TEXT      | PK                    | `tenant_xxx`                         |
-| name           | TEXT      | NOT NULL              | Display name                         |
-| subdomain      | TEXT      | NOT NULL UNIQUE       | URL slug                             |
-| customDomain   | TEXT      |                       | Custom domain (Pro+)                 |
-| plan           | TEXT      | enum, default 'basic' | basic / pro / enterprise             |
-| planExpiresAt  | INTEGER   |                       | Unix timestamp                       |
-| logoUrl        | TEXT      |                       | URL ke logo                          |
-| primaryColor   | TEXT      | default '#2563eb'     | Hex color                            |
-| createdAt      | INTEGER   | NOT NULL              | Unix timestamp                       |
+| Column           | Type      | Constraints           | Description                          |
+| ---------------- | --------- | --------------------- | ------------------------------------ |
+| id               | TEXT      | PK                    | `tenant_xxx`                         |
+| name             | TEXT      | NOT NULL              | Display name                         |
+| subdomain        | TEXT      | NOT NULL UNIQUE       | URL slug                             |
+| customDomain     | TEXT      |                       | Custom domain (Pro+)                 |
+| plan             | TEXT      | enum, default 'basic' | basic / pro / enterprise             |
+| planExpiresAt    | INTEGER   |                       | Unix timestamp                       |
+| logoUrl          | TEXT      |                       | URL ke logo                          |
+| primaryColor     | TEXT      | default '#2563eb'     | Hex color                            |
+| messagingChannel | TEXT      | default 'whatsapp'    | Active channel: whatsapp / telegram  |
+| whatsappNumber   | TEXT      |                       | Nomor WA (format 628xxx)             |
+| whatsappToken    | TEXT      |                       | Fonnte API token                     |
+| telegramBotToken | TEXT      |                       | Telegram Bot API token               |
+| telegramBotUsername | TEXT   |                       | Bot username (tanpa @)               |
+| createdAt        | INTEGER   | NOT NULL              | Unix timestamp                       |
 
 ### 2. `branches`
 
@@ -117,24 +134,29 @@ Staff/karyawan dengan role-based access.
 
 Pelanggan dengan tier loyalty.
 
-| Column         | Type    | Description                                  |
-| -------------- | ------- | -------------------------------------------- |
-| id             | TEXT PK |                                              |
-| tenantId       | TEXT FK |                                              |
-| name           | TEXT    | NOT NULL                                     |
-| phone          | TEXT    | NOT NULL                                     |
-| address        | TEXT    |                                              |
-| notes          | TEXT    | Free-form admin notes                        |
-| tier           | TEXT    | enum: silver / gold / platinum               |
-| points         | INTEGER | Loyalty points                               |
-| totalOrders    | INTEGER | Cached count for performance                 |
-| totalSpending  | INTEGER | Cached sum                                   |
-| isBlacklisted  | BOOLEAN |                                              |
-| createdAt      | INTEGER |                                              |
+| Column           | Type    | Description                                  |
+| ---------------- | ------- | -------------------------------------------- |
+| id               | TEXT PK |                                              |
+| tenantId         | TEXT FK |                                              |
+| name             | TEXT    | NOT NULL                                     |
+| phone            | TEXT    | NOT NULL                                     |
+| address          | TEXT    |                                              |
+| notes            | TEXT    | Free-form admin notes                        |
+| tier             | TEXT    | enum: silver / gold / platinum               |
+| points           | INTEGER | Loyalty points                               |
+| totalOrders      | INTEGER | Cached count for performance                 |
+| totalSpending    | INTEGER | Cached sum                                   |
+| isBlacklisted    | BOOLEAN |                                              |
+| telegramChatId   | TEXT    | Telegram chat ID for messaging               |
+| telegramUsername | TEXT    | Telegram username (tanpa @)                  |
+| createdAt        | INTEGER |                                              |
 
 **Indexes**: `tenantId`, `(tenantId, phone)`
 
-🔵 **Note**: `totalOrders` dan `totalSpending` di-denormalize untuk performance. Update via trigger atau di repository saat order completed.
+🔵 **Note**: `totalOrders`, `totalSpending`, `tier`, dan `points` di-denormalize untuk performance. Auto-update via repository saat payment recorded:
+- `totalSpending` += payment amount
+- `points` += payment amount / 1000
+- `tier` upgrade otomatis: Silver (default), Gold (≥ Rp 500K), Platinum (≥ Rp 2M)
 
 ### 5. `services`
 
@@ -448,6 +470,107 @@ Pencatatan pengeluaran operasional (OPEX).
 
 ---
 
+## Tabel Baru (v0.5.0) — Messaging, Notifications & Security
+
+### 19. `notifications`
+
+Persistent notifications per user.
+
+| Column      | Type    | Description                                    |
+| ----------- | ------- | ---------------------------------------------- |
+| id          | TEXT PK | `notif_xxx`                                    |
+| tenantId    | TEXT FK |                                                |
+| userId      | TEXT FK | → users.id (nullable, null = all users)        |
+| type        | TEXT    | order / payment / pickup / system / marketing  |
+| title       | TEXT    | NOT NULL                                       |
+| message     | TEXT    | NOT NULL                                       |
+| link        | TEXT    | URL path to navigate (e.g. `/orders`)          |
+| isRead      | BOOLEAN | default false                                  |
+| createdAt   | INTEGER |                                                |
+
+**Indexes**: `tenantId`, `(tenantId, userId)`, `(tenantId, isRead)`
+
+**Use case**:
+- Order status change → create notification
+- Payment received → create notification
+- Low stock alert → create notification
+- Mark read via PATCH `/api/notifications/[id]`
+- Mark all read via PATCH `/api/notifications`
+
+### 20. `campaigns`
+
+Marketing campaigns persistent storage.
+
+| Column           | Type    | Description                                    |
+| ---------------- | ------- | ---------------------------------------------- |
+| id               | TEXT PK | `camp_xxx`                                     |
+| tenantId         | TEXT FK |                                                |
+| name             | TEXT    | NOT NULL — campaign name                       |
+| segment          | TEXT    | all / gold / platinum / inactive / new         |
+| channel          | TEXT    | whatsapp / telegram (from tenant setting)      |
+| body             | TEXT    | Message body with placeholders                 |
+| status           | TEXT    | enum: draft / scheduled / sent / cancelled     |
+| scheduledAt      | INTEGER | Scheduled send time (nullable)                 |
+| sentAt           | INTEGER | Actual send time                               |
+| recipientCount   | INTEGER | Total recipients targeted                      |
+| deliveredCount   | INTEGER | Successfully delivered                         |
+| readCount        | INTEGER | Read/opened                                    |
+| conversionCount  | INTEGER | Resulted in order                              |
+| createdAt        | INTEGER |                                                |
+
+**Indexes**: `tenantId`, `(tenantId, status)`
+
+**Segment stats**: Recipient count calculated from real customer data:
+- `all` → all active customers
+- `gold` → customers with tier = gold
+- `platinum` → customers with tier = platinum
+- `inactive` → customers with no order in 30 days
+- `new` → customers created in last 7 days
+
+### 21. `messages`
+
+Persistent chat messages (WhatsApp & Telegram).
+
+| Column      | Type    | Description                                    |
+| ----------- | ------- | ---------------------------------------------- |
+| id          | TEXT PK | `msg_xxx`                                      |
+| tenantId    | TEXT FK |                                                |
+| customerId  | TEXT FK | → customers.id                                 |
+| direction   | TEXT    | enum: inbound / outbound                       |
+| channel     | TEXT    | whatsapp / telegram                            |
+| body        | TEXT    | Message content                                |
+| isBot       | BOOLEAN | true if sent/replied by bot                    |
+| isRead      | BOOLEAN | default false (for inbound)                    |
+| createdAt   | INTEGER |                                                |
+
+**Indexes**: `tenantId`, `(tenantId, customerId)`, `(tenantId, isRead)`
+
+**Use case**:
+- Incoming message from webhook → insert with direction=`inbound`
+- Admin reply from chat UI → insert with direction=`outbound`, isBot=false
+- Bot auto-reply → insert with direction=`outbound`, isBot=true
+- Chat inbox: GROUP BY customerId, ORDER BY createdAt DESC
+- Thread view: WHERE customerId=? ORDER BY createdAt ASC
+
+### 22. `tenant_security_settings`
+
+Security configuration per tenant (persisted toggles).
+
+| Column                  | Type    | Description                                    |
+| ----------------------- | ------- | ---------------------------------------------- |
+| tenantId                | TEXT PK | → tenants.id (1:1 relationship)                |
+| twoFactorEnabled        | BOOLEAN | default false                                  |
+| auditLogEnabled         | BOOLEAN | default true                                   |
+| ipWhitelistEnabled      | BOOLEAN | default false                                  |
+| sessionTimeoutEnabled   | BOOLEAN | default true                                   |
+| sessionTimeoutMinutes   | INTEGER | default 60                                     |
+| ipWhitelist             | TEXT    | Comma-separated IPs or CIDR (nullable)         |
+| updatedAt               | INTEGER |                                                |
+
+**Note**: This is a 1:1 table with `tenants`. Created on first access if not exists. No separate tenantId FK — tenantId IS the PK.
+
+---
+
 ## Schema Conventions
 
 ### Primary Keys
@@ -471,6 +594,9 @@ Semua PK adalah `TEXT` dengan prefix:
 - `poi_xxx` (purchase order items)
 - `expcat_xxx` (expense categories)
 - `exp_xxx` (expenses)
+- `notif_xxx` (notifications)
+- `camp_xxx` (campaigns)
+- `msg_xxx` (messages)
 
 Generated via `generateId(prefix)` helper di `repositories.ts`.
 
@@ -518,13 +644,19 @@ export type Customer = typeof customers.$inferSelect;
 export type NewCustomer = typeof customers.$inferInsert;
 // ... dll
 
-// New tables (v0.4.0)
+// Financial tables (v0.4.0)
 export type InventoryMovement = typeof inventoryMovements.$inferSelect;
 export type Supplier = typeof suppliers.$inferSelect;
 export type PurchaseOrder = typeof purchaseOrders.$inferSelect;
 export type PurchaseOrderItem = typeof purchaseOrderItems.$inferSelect;
 export type Expense = typeof expenses.$inferSelect;
 export type ExpenseCategory = typeof expenseCategories.$inferSelect;
+
+// New tables (v0.5.0)
+export type Notification = typeof notifications.$inferSelect;
+export type Campaign = typeof campaigns.$inferSelect;
+export type Message = typeof messages.$inferSelect;
+export type TenantSecuritySettings = typeof tenantSecuritySettings.$inferSelect;
 ```
 
 Used di repositories dan API layer untuk type safety end-to-end.

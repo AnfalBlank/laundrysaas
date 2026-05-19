@@ -11,15 +11,16 @@ Production:  https://[bisnis].laundryhub.id/api
 
 ## Authentication
 
-Saat ini menggunakan **cookie-based demo auth**:
+**Cookie-based auth with bcrypt password verification**:
 - Cookie `laundryhub_user` berisi user ID
 - `getCurrentUser()` di `src/lib/auth.ts` resolve user dari cookie
 - Tenant ID derived dari user record
+- Login via `POST /api/auth/login` dengan email + password (bcrypt verified)
 
-🔜 **Production**: JWT Bearer token di header:
-```
-Authorization: Bearer eyJhbGc...
-```
+**RBAC API Guards**:
+- Semua API routes dilindungi oleh `api-guard.ts` middleware
+- Permission check server-side berdasarkan role user
+- Return `403 Forbidden` bila role tidak punya akses ke endpoint
 
 ## Conventions
 
@@ -684,6 +685,414 @@ Switch user (demo auth).
 ```
 
 **Effect**: Sets `laundryhub_user` cookie → redirect to dashboard.
+
+---
+
+## Auth Endpoints (v0.5.0)
+
+### `POST /api/auth/login`
+
+Authenticate user with email + password (bcrypt verification).
+
+**Request**:
+```json
+{
+  "email": "owner@laundrysukses.com",
+  "password": "securepassword123"
+}
+```
+
+**Response** (200):
+```json
+{
+  "user": {
+    "id": "usr_xxx",
+    "name": "Budi Owner",
+    "email": "owner@laundrysukses.com",
+    "role": "owner"
+  }
+}
+```
+
+**Error** (401):
+```json
+{
+  "error": "Email atau password salah"
+}
+```
+
+**Effect**: Sets `laundryhub_user` cookie on success.
+
+---
+
+## Chat Endpoints (v0.5.0)
+
+### `GET /api/chat`
+
+List conversations (grouped by customer, latest message first).
+
+**Response**:
+```json
+{
+  "conversations": [
+    {
+      "customerId": "cst_xxx",
+      "customerName": "Rina Marlina",
+      "customerPhone": "0813-3344-5566",
+      "lastMessage": "Mau cuci 3kg pickup besok",
+      "lastMessageAt": "2026-05-19T10:30:00Z",
+      "unreadCount": 2,
+      "channel": "telegram",
+      "isBot": false
+    }
+  ]
+}
+```
+
+### `POST /api/chat`
+
+Send a message to a customer (admin reply).
+
+**Request**:
+```json
+{
+  "customerId": "cst_xxx",
+  "body": "Baik Kak, driver kami akan datang besok jam 10."
+}
+```
+
+### `GET /api/chat/[customerId]`
+
+Get message thread for a specific customer.
+
+**Response**:
+```json
+{
+  "messages": [
+    {
+      "id": "msg_xxx",
+      "direction": "inbound",
+      "channel": "telegram",
+      "body": "Mau cuci 3kg pickup besok",
+      "isBot": false,
+      "isRead": true,
+      "createdAt": "2026-05-19T10:30:00Z"
+    },
+    {
+      "id": "msg_yyy",
+      "direction": "outbound",
+      "channel": "telegram",
+      "body": "Baik Kak, driver kami akan datang besok jam 10.",
+      "isBot": false,
+      "isRead": true,
+      "createdAt": "2026-05-19T10:32:00Z"
+    }
+  ],
+  "customer": {
+    "id": "cst_xxx",
+    "name": "Rina Marlina",
+    "phone": "0813-3344-5566"
+  }
+}
+```
+
+### `POST /api/chat/[customerId]`
+
+Send reply to specific customer thread.
+
+**Request**:
+```json
+{
+  "body": "Laundry Kakak sudah selesai, bisa diambil hari ini."
+}
+```
+
+---
+
+## Telegram Endpoints (v0.5.0)
+
+### `POST /api/telegram/webhook`
+
+Incoming message webhook from Telegram Bot API. Called by Telegram servers.
+
+**Request** (Telegram Update object):
+```json
+{
+  "update_id": 123456,
+  "message": {
+    "message_id": 789,
+    "from": { "id": 12345, "first_name": "Rina", "username": "rina_m" },
+    "chat": { "id": 12345, "type": "private" },
+    "text": "harga"
+  }
+}
+```
+
+**Effect**:
+1. Find/create customer by telegram chat ID
+2. Save message to `messages` table
+3. Process auto-reply (if keyword matched)
+4. Process auto-create order (if order data detected)
+
+### `POST /api/telegram/setup`
+
+Register webhook URL with Telegram Bot API.
+
+**Request**: No body needed (uses tenant's bot token from settings).
+
+**Response**:
+```json
+{
+  "success": true,
+  "webhookUrl": "https://laundrysukses.laundryhub.id/api/telegram/webhook"
+}
+```
+
+### `GET /api/telegram/setup`
+
+Check current webhook status.
+
+**Response**:
+```json
+{
+  "isActive": true,
+  "webhookUrl": "https://laundrysukses.laundryhub.id/api/telegram/webhook",
+  "lastError": null
+}
+```
+
+---
+
+## Messaging Endpoints (v0.5.0)
+
+### `POST /api/messaging/send`
+
+Generic send message via active channel (WhatsApp or Telegram).
+
+**Request**:
+```json
+{
+  "customerId": "cst_xxx",
+  "body": "Halo Kak, laundry sudah selesai!"
+}
+```
+
+**Effect**: Sends via tenant's active messaging channel. Creates `messages` record.
+
+---
+
+## Campaign Endpoints (v0.5.0)
+
+### `GET /api/campaigns`
+
+List marketing campaigns.
+
+**Response**:
+```json
+{
+  "campaigns": [
+    {
+      "id": "camp_xxx",
+      "name": "Promo Akhir Bulan",
+      "segment": "all",
+      "channel": "whatsapp",
+      "status": "sent",
+      "recipientCount": 150,
+      "deliveredCount": 142,
+      "readCount": 98,
+      "conversionCount": 12,
+      "sentAt": "2026-05-15T19:00:00Z",
+      "createdAt": "2026-05-15T10:00:00Z"
+    }
+  ]
+}
+```
+
+### `POST /api/campaigns`
+
+Create and optionally send a campaign.
+
+**Request**:
+```json
+{
+  "name": "Promo Weekend",
+  "segment": "gold",
+  "body": "Halo {customer}! Diskon 20% khusus member Gold weekend ini. Yuk cuci sekarang!",
+  "status": "sent"
+}
+```
+
+**Segment options**: `all`, `gold`, `platinum`, `inactive`, `new`
+
+---
+
+## Notification Endpoints (v0.5.0)
+
+### `GET /api/notifications`
+
+List notifications for current user.
+
+**Response**:
+```json
+{
+  "notifications": [
+    {
+      "id": "notif_xxx",
+      "type": "order",
+      "title": "Order Baru",
+      "message": "Order INV-20260519-003 dari Rina Marlina",
+      "link": "/orders",
+      "isRead": false,
+      "createdAt": "2026-05-19T10:00:00Z"
+    }
+  ],
+  "unreadCount": 5
+}
+```
+
+### `PATCH /api/notifications`
+
+Mark all notifications as read.
+
+**Response**:
+```json
+{
+  "success": true,
+  "markedCount": 5
+}
+```
+
+### `PATCH /api/notifications/[id]`
+
+Mark single notification as read.
+
+**Response**:
+```json
+{
+  "success": true
+}
+```
+
+---
+
+## Security Endpoints (v0.5.0)
+
+### `GET /api/security`
+
+Get tenant security settings.
+
+**Response**:
+```json
+{
+  "twoFactorEnabled": false,
+  "auditLogEnabled": true,
+  "ipWhitelistEnabled": false,
+  "sessionTimeoutEnabled": true,
+  "sessionTimeoutMinutes": 60,
+  "ipWhitelist": null
+}
+```
+
+### `PATCH /api/security`
+
+Update security settings.
+
+**Request**:
+```json
+{
+  "twoFactorEnabled": true,
+  "sessionTimeoutMinutes": 30
+}
+```
+
+---
+
+## Payment Endpoints (v0.5.0)
+
+### `POST /api/payments/[id]/refund`
+
+Refund a payment. Creates negative payment record.
+
+**Response**:
+```json
+{
+  "refund": {
+    "id": "pay_xxx",
+    "orderId": "ord_xxx",
+    "amount": -35000,
+    "method": "refund",
+    "reference": "Refund of pay_original",
+    "paidAt": "2026-05-19T12:00:00Z"
+  }
+}
+```
+
+**Effect**:
+1. Creates payment record with negative amount
+2. Updates order `paymentStatus` (paid → unpaid/partial)
+
+### `POST /api/payments/reminder`
+
+Send payment reminder to all customers with unpaid orders.
+
+**Response**:
+```json
+{
+  "success": true,
+  "sentCount": 5,
+  "message": "Reminder terkirim ke 5 customer"
+}
+```
+
+**Effect**: Sends notification via active messaging channel to each customer with outstanding payment.
+
+---
+
+## Purchase Order Endpoints (v0.5.0)
+
+### `GET /api/purchase-orders/[id]`
+
+Get PO detail with line items.
+
+**Response**:
+```json
+{
+  "purchaseOrder": {
+    "id": "po_xxx",
+    "poNumber": "PO-20260519-001",
+    "status": "ordered",
+    "supplierName": "PT Daia Indonesia",
+    "total": 2500000,
+    "notes": "Restock bulanan",
+    "createdAt": "2026-05-19T08:00:00Z"
+  },
+  "items": [
+    {
+      "id": "poi_xxx",
+      "itemName": "Detergent Premium",
+      "quantity": 50,
+      "unitPrice": 15000,
+      "total": 750000,
+      "receivedQuantity": 0
+    }
+  ]
+}
+```
+
+---
+
+## WhatsApp Template Endpoints (v0.5.0)
+
+### `PATCH /api/whatsapp/templates/[id]`
+
+Toggle template active/inactive.
+
+**Request**:
+```json
+{
+  "isActive": false
+}
+```
 
 ---
 

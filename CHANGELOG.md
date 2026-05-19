@@ -8,14 +8,110 @@ Versioning: [Semantic Versioning](https://semver.org/)
 ## [Unreleased]
 
 ### Planned
-- Real authentication (NextAuth.js + bcrypt password hashing)
-- API route guards untuk role-based permission check
-- Middleware Next.js untuk block protected routes per role
-- WhatsApp webhook integration (Fonnte production)
 - Payment gateway live (Midtrans webhook)
 - Realtime updates via Pusher / Supabase Realtime
 - Print thermal invoice via WebUSB
 - AI auto-reply via OpenAI (live integration)
+
+## [0.5.0] — 2026-05-19
+
+### Added — Messaging & Chat
+
+- **Telegram Bot Integration**:
+  - Setup via BotFather → token → webhook otomatis
+  - Auto-reply commands: `/start`, `harga`, `pickup`, `status`, `jam buka`, `admin`
+  - Auto-create order dari chat (alamat + jam + berat → order dibuat)
+  - Webhook endpoint menerima pesan masuk real-time
+- **Multi-Channel Messaging**:
+  - Settings → Messaging tab: switch antara WhatsApp (Fonnte) dan Telegram
+  - `messaging.ts` abstraction layer — kirim pesan via channel aktif
+  - Generic send endpoint (`/api/messaging/send`)
+- **Real Chat Inbox**:
+  - Tabel `messages` persistent di database
+  - Conversations list dari DB (bukan dummy)
+  - Admin bisa reply langsung dari halaman WhatsApp/Telegram
+  - Indikator bot vs human message
+  - Read/unread status per pesan
+
+### Added — Security & Authentication
+
+- **Password Hashing (bcrypt)**:
+  - `password.ts` utility: `hashPassword()` + `verifyPassword()`
+  - Login endpoint sekarang verifikasi password hash real
+  - Tidak lagi plain-text comparison
+- **RBAC API Guards**:
+  - `api-guard.ts` middleware enforce permission di semua API routes
+  - Server-side permission check — bukan hanya UI hiding
+  - Return 403 Forbidden bila role tidak punya akses
+- **Security Settings persist to DB**:
+  - Tabel `tenant_security_settings` menyimpan toggle keamanan
+  - Two-Factor, Audit Log, IP Whitelist, Session Timeout tersimpan real
+  - GET/PATCH `/api/security` endpoints
+
+### Added — Orders & Payments
+
+- **Multi-Item Orders**:
+  - Form order sekarang support multiple layanan per order
+  - Tombol "+ Tambah Layanan" di form input
+  - Subtotal per item, grand total otomatis
+- **Discount**:
+  - Field diskon di form order (nominal atau persentase)
+  - Express surcharge otomatis +50% dari subtotal
+  - Kalkulasi: subtotal − discount + express surcharge = total
+- **Refund**:
+  - Tombol Refund di tabel pembayaran
+  - Buat record payment negatif (amount minus)
+  - Update payment status order sesuai sisa
+- **Payment Reminder**:
+  - Tombol "Kirim Reminder" di halaman Payments
+  - Kirim notifikasi ke semua customer dengan order unpaid
+  - Via channel aktif (WhatsApp/Telegram)
+
+### Added — Marketing & Notifications
+
+- **Marketing Campaigns persist to DB**:
+  - Tabel `campaigns` menyimpan semua campaign
+  - Segment stats dari data real (customer count per segment)
+  - Status tracking: draft → scheduled → sent
+  - Metrics: recipientCount, deliveredCount, readCount, conversionCount
+- **Notifications API**:
+  - Tabel `notifications` persistent (bukan generated)
+  - Read/unread status per notifikasi
+  - Mark single read (`PATCH /api/notifications/[id]`)
+  - Mark all read (`PATCH /api/notifications`)
+  - GET endpoint dengan filter
+
+### Added — Operations
+
+- **Suppliers Manager**:
+  - Tab baru di Settings untuk CRUD supplier
+  - Nama, phone, email, contact person, notes
+  - Toggle active/inactive
+- **PO Detail Modal**:
+  - Klik PO di tabel → modal detail dengan line items
+  - GET `/api/purchase-orders/[id]` return items
+- **Pickup → Order status sync**:
+  - Pickup status `ongoing` → order status otomatis `PICKUP_PROCESS`
+  - Pickup status `completed` → order status otomatis `RECEIVED`
+- **Customer loyalty auto-update**:
+  - Saat payment recorded: tier, points, totalSpending auto-increment
+  - Threshold tier: Silver (0), Gold (≥ 500K), Platinum (≥ 2M)
+
+### Changed
+
+- Authentication: dari demo cookie-switch ke real password verification
+- API routes: semua endpoint sekarang enforce RBAC server-side
+- WhatsApp page: dari dummy data ke real conversations dari DB
+- Marketing page: campaigns tersimpan di DB, bukan state saja
+- Notifications: dari generated ke persistent table
+- Database: dari 18 tabel ke 22 tabel
+- Settings Security tab: dari UI-only ke persist DB
+
+### Fixed
+
+- Login sekarang verify bcrypt hash (sebelumnya plain text)
+- Pickup status change sekarang sync ke order status
+- Customer tier/points sekarang auto-update saat payment
 
 ## [0.4.0] — 2026-05-17
 

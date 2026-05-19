@@ -107,7 +107,7 @@ src/
 │       └── laundry-icons.tsx  # 30+ custom 3D SVG
 │
 ├── db/
-│   ├── schema.ts              # Drizzle schema (18 tables)
+│   ├── schema.ts              # Drizzle schema (22 tables)
 │   ├── client.ts              # libSQL client
 │   ├── repositories.ts        # Query functions
 │   └── seed.ts                # Demo data
@@ -117,6 +117,10 @@ src/
     ├── tenant.ts              # getCurrentTenantId()
     ├── auth.ts                # getCurrentUser(), hasPermission(), canAccessPage()
     ├── auth-types.ts          # Role type, AuthUser interface (client-safe)
+    ├── api-guard.ts           # RBAC middleware for API routes
+    ├── password.ts            # bcrypt hashPassword(), verifyPassword()
+    ├── messaging.ts           # Multi-channel abstraction (WhatsApp/Telegram)
+    ├── notify.ts              # Notification system (create, send)
     ├── export.ts              # CSV/PDF export utilities
     └── dummy-data.ts          # UI constants (status labels)
 ```
@@ -190,22 +194,35 @@ Lihat [Multi-Tenant](./multi-tenant.md) untuk detail.
 
 ## Authentication &amp; RBAC
 
-### Current Implementation (Demo)
+### Current Implementation
 
-Cookie-based user switching for testing:
+Cookie-based auth with **bcrypt password verification** and **server-side RBAC guards**:
 
 ```
 src/lib/auth.ts          — Server-only: getCurrentUser(), hasPermission(), canAccessPage()
 src/lib/auth-types.ts    — Client-safe: Role type, AuthUser interface, ROLE_LABELS
+src/lib/password.ts      — bcrypt: hashPassword(), verifyPassword()
+src/lib/api-guard.ts     — RBAC middleware: enforces permissions on all API routes
+src/app/api/auth/login   — POST endpoint: email + password verification (bcrypt)
 src/app/api/auth/switch  — POST endpoint to switch user (sets cookie)
 ```
 
-**Flow**:
-1. Cookie `laundryhub_user` stores user ID
-2. `getCurrentUser()` reads cookie → queries DB → returns `AuthUser`
-3. `AppShell` (server component) calls `getCurrentUser()` → passes to Sidebar/Topbar
-4. Sidebar filters menu items via `canAccessPage(role, path)`
-5. Dashboard renders role-specific component based on `user.role`
+**Login Flow**:
+1. User submits email + password to `POST /api/auth/login`
+2. Server finds user by email, verifies password via `bcrypt.compare()`
+3. On success: sets `laundryhub_user` cookie → redirect to dashboard
+4. On failure: returns 401 Unauthorized
+
+**RBAC Flow**:
+1. Every API route calls `apiGuard(request, requiredPermission)`
+2. `apiGuard` reads cookie → resolves user → checks `hasPermission(role, permission)`
+3. If authorized: proceeds with handler
+4. If unauthorized: returns `403 Forbidden`
+
+**Page Access Flow**:
+1. `AppShell` (server component) calls `getCurrentUser()` → passes to Sidebar/Topbar
+2. Sidebar filters menu items via `canAccessPage(role, path)`
+3. Dashboard renders role-specific component based on `user.role`
 
 ### 4 Roles
 
@@ -228,20 +245,72 @@ const ROLE_PERMISSIONS = {
 }
 ```
 
-### Limitations (Current)
+### API Guard Usage
 
-- API routes do NOT enforce permission checks server-side (planned)
-- No middleware blocking protected routes per role (planned)
-- Password hashing not implemented (demo uses plain text comparison)
+```typescript
+// src/lib/api-guard.ts
+export async function apiGuard(request: Request, permission: string) {
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!hasPermission(user.role, permission)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+  return user; // proceed
+}
 
-### Production Plan
+// Usage in API route:
+export async function POST(request: Request) {
+  const user = await apiGuard(request, "orders:create");
+  if (user instanceof NextResponse) return user; // 401/403
+  // ... handle request
+}
+```
 
-- NextAuth.js / Auth.js with credentials provider
-- bcrypt password hashing
-- JWT session tokens
-- Middleware for route protection
-- API route guards
-- 2FA via OTP
+### Password Utilities
+
+```typescript
+// src/lib/password.ts
+import bcrypt from "bcrypt";
+
+export async function hashPassword(plain: string): Promise<string> {
+  return bcrypt.hash(plain, 12);
+}
+
+export async function verifyPassword(plain: string, hash: string): Promise<boolean> {
+  return bcrypt.compare(plain, hash);
+}
+```
+
+### Messaging Abstraction
+
+```typescript
+// src/lib/messaging.ts
+export async function sendMessage(tenantId: string, phone: string, body: string) {
+  const tenant = await getTenant(tenantId);
+  if (tenant.messagingChannel === "telegram") {
+    return sendTelegram(tenant.telegramBotToken, chatId, body);
+  } else {
+    return sendWhatsApp(tenant.whatsappToken, phone, body);
+  }
+}
+```
+
+### Notification System
+
+```typescript
+// src/lib/notify.ts
+export async function createNotification(data: {
+  tenantId: string;
+  userId?: string;
+  type: string;
+  title: string;
+  message: string;
+  link?: string;
+}) {
+  // Insert into notifications table
+  // Returns notification object
+}
+```
 
 Lihat [Authentication](./authentication.md).
 

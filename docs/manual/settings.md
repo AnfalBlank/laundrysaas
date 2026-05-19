@@ -6,7 +6,7 @@ Konfigurasi tenant, branding, integrasi, subscription, dan keamanan.
 
 Menu: **Settings** (hanya Owner)
 
-Settings dibagi 6 tab:
+Settings dibagi 8 tab:
 
 ## 1. Profil Bisnis
 
@@ -113,7 +113,76 @@ Setiap integrasi punya badge:
 - 🟢 **Terhubung** — aktif
 - ⚪ **Belum** — perlu setup
 
-## 5. Subscription
+## 5. Messaging
+
+Konfigurasi channel messaging untuk notifikasi dan chat customer.
+
+### Channel Switcher
+
+Pilih channel aktif:
+
+| Channel   | Provider | Setup                                    |
+| --------- | -------- | ---------------------------------------- |
+| WhatsApp  | Fonnte   | Nomor WA + API Token                     |
+| Telegram  | Bot API  | Bot Token + Username                     |
+
+Hanya 1 channel aktif pada satu waktu. Semua notifikasi dan auto-reply menggunakan channel yang dipilih.
+
+### Konfigurasi WhatsApp
+
+1. Input **Nomor WhatsApp** (format: 628xxx)
+2. Input **Fonnte API Token**
+3. Klik **Simpan**
+
+### Konfigurasi Telegram
+
+1. Input **Bot Token** (dari BotFather)
+2. Input **Bot Username** (tanpa @)
+3. Klik **Simpan**
+4. Klik **Setup Webhook** untuk register webhook URL
+
+### Webhook Status
+
+Setelah setup, status webhook ditampilkan:
+- ✅ **Webhook Active** — pesan masuk diteruskan ke LaundryHub
+- ❌ **Webhook Inactive** — perlu setup ulang
+
+Klik **Check Status** untuk verifikasi webhook masih aktif.
+
+### Test Kirim
+
+Klik **Test Kirim** untuk mengirim pesan test via channel aktif dan memverifikasi koneksi berfungsi.
+
+## 6. Suppliers
+
+Manajemen data supplier untuk Purchase Orders.
+
+### Tambah Supplier
+
+1. Klik **+ Tambah Supplier**
+2. Isi:
+   - Nama supplier (wajib)
+   - Phone
+   - Email
+   - Alamat
+   - Contact Person (PIC)
+   - Catatan
+3. Klik **Simpan**
+
+### Edit Supplier
+
+1. Klik icon **Edit** di baris supplier
+2. Update data
+3. Simpan
+
+### Hapus / Non-aktifkan Supplier
+
+- Toggle **Active/Inactive** untuk non-aktifkan tanpa hapus
+- Supplier non-aktif tidak muncul di dropdown saat buat PO
+
+🔵 **Tip**: Non-aktifkan supplier daripada hapus — agar history PO tetap terhubung.
+
+## 7. Subscription
 
 ### Current Plan
 
@@ -155,16 +224,25 @@ Klik **Riwayat Tagihan** untuk lihat invoice bulanan + receipt.
 
 Klik **Cancel Plan** di plan card. Effective di end of billing cycle. Data tetap accessible 30 hari, lalu archived.
 
-## 6. Keamanan
+## 8. Keamanan
 
-4 toggle security options:
+4 toggle security options — **semua tersimpan di database** (tabel `tenant_security_settings`):
 
 | Option                       | Recommended | Effect                                                |
 | ---------------------------- | ----------- | ----------------------------------------------------- |
 | Two-Factor Authentication    | ON          | Login butuh OTP via SMS/email                         |
 | Audit Log                    | ON          | Log semua aktivitas user                              |
 | IP Whitelist                 | OFF (default) | Batasi akses ke IP tertentu (B2B/internal)          |
-| Session Timeout              | ON          | Auto logout setelah 60 menit idle                     |
+| Session Timeout              | ON          | Auto logout setelah N menit idle (configurable)       |
+
+🔵 **Baru**: Toggle keamanan sekarang **persist ke database**. Perubahan tersimpan real-time dan berlaku untuk semua user di tenant. Sebelumnya hanya UI state.
+
+### Session Timeout
+
+Bila diaktifkan:
+- Default: 60 menit
+- Bisa diubah via input field (menit)
+- User otomatis logout setelah idle melebihi batas
 
 ### Password Policy
 
