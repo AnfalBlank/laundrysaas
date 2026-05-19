@@ -43,7 +43,6 @@ export function OwnerDashboard({
           <StatCard
             label="Omzet Hari Ini"
             value={formatRevenue(stats.revenueToday)}
-            delta={12.4}
             variant="blue"
             icon={<Receipt3D className="w-9 h-9" />}
           />
@@ -51,14 +50,12 @@ export function OwnerDashboard({
         <StatCard
           label="Order Hari Ini"
           value={String(stats.ordersToday)}
-          delta={8.2}
           variant="cyan"
           icon={<WashingMachine3D className="w-9 h-9" />}
         />
         <StatCard
           label="Laundry Aktif"
           value={String(stats.activeOrders)}
-          delta={-3.1}
           deltaLabel="proses berjalan"
           variant="purple"
           icon={<Sparkles3D className="w-9 h-9" />}
@@ -66,7 +63,6 @@ export function OwnerDashboard({
         <StatCard
           label="Pickup Pending"
           value={String(stats.pickupPending)}
-          delta={5}
           deltaLabel="butuh assign"
           variant="orange"
           icon={<TruckDelivery3D className="w-9 h-9" />}

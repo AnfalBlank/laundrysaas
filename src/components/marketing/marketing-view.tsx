@@ -201,8 +201,8 @@ export default function MarketingView({
             v: "purple" as const,
             icon: <Users size={22} />,
           },
-          { label: "Open Rate", value: "78%", v: "green" as const, icon: <Send size={22} /> },
-          { label: "Conversion", value: "11%", v: "amber" as const, icon: <Sparkles size={22} /> },
+          { label: "Open Rate", value: "—", v: "green" as const, icon: <Send size={22} /> },
+          { label: "Conversion", value: "—", v: "amber" as const, icon: <Sparkles size={22} /> },
         ].map((s) => (
           <Card key={s.label} className="p-4 sm:p-5 flex items-center justify-between gap-2">
             <div className="min-w-0">

@@ -23,8 +23,11 @@ export async function POST(req: Request) {
   if (guard instanceof NextResponse) return guard;
   try {
     const body = await req.json();
-    if (!body.serviceId || !body.qty) {
-      return NextResponse.json({ error: "serviceId and qty required" }, { status: 400 });
+    // Support both single-item (serviceId+qty) and multi-item (items[])
+    const hasItems = body.items && Array.isArray(body.items) && body.items.length > 0;
+    const hasSingle = body.serviceId && body.qty;
+    if (!hasItems && !hasSingle) {
+      return NextResponse.json({ error: "serviceId+qty or items[] required" }, { status: 400 });
     }
     if (!body.customerId && !body.customerPhone) {
       return NextResponse.json({ error: "Customer info required" }, { status: 400 });

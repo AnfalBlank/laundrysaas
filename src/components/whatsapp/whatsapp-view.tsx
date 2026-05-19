@@ -7,7 +7,6 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Icon3D } from "@/components/ui/icon3d";
 import { Telegram3D, Whatsapp3D, Sparkles3D } from "@/components/ui/laundry-icons";
-import { chats } from "@/lib/dummy-data";
 import { cn } from "@/lib/utils";
 import {
   Bot,
@@ -235,11 +234,11 @@ export function WhatsappView({
             variant: "green" as const,
             icon: <Send size={22} />,
           },
-          { label: "Auto-Reply", value: "94%", variant: "blue" as const, icon: <Bot size={22} /> },
-          { label: "Order via WA", value: "68", variant: "cyan" as const, icon: <Zap size={22} /> },
+          { label: "Auto-Reply", value: "—", variant: "blue" as const, icon: <Bot size={22} /> },
+          { label: "Order via Bot", value: "—", variant: "cyan" as const, icon: <Zap size={22} /> },
           {
             label: "Open Rate",
-            value: "82%",
+            value: "—",
             variant: "purple" as const,
             icon: <Sparkles size={22} />,
           },
