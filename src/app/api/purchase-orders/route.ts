@@ -1,9 +1,12 @@
 import { NextResponse } from "next/server";
 import { listPurchaseOrders, createPurchaseOrder } from "@/db/repositories";
+import { requirePermission } from "@/lib/api-guard";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
+  const guard = await requirePermission("purchase_orders:read");
+  if (guard instanceof NextResponse) return guard;
   try {
     const { searchParams } = new URL(req.url);
     const status = searchParams.get("status") ?? undefined;
@@ -15,6 +18,8 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
+  const guard = await requirePermission("purchase_orders:create");
+  if (guard instanceof NextResponse) return guard;
   try {
     const body = await req.json();
     if (!body.items || !Array.isArray(body.items) || body.items.length === 0) {

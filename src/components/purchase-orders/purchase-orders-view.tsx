@@ -73,6 +73,17 @@ export function PurchaseOrdersView({
   const router = useRouter();
   const toast = useToast();
   const [showCreate, setShowCreate] = useState(false);
+  const [showDetail, setShowDetail] = useState(false);
+  const [detailPO, setDetailPO] = useState<{
+    id: string;
+    poNumber: string;
+    status: string;
+    total: number;
+    notes: string | null;
+    supplierName: string | null;
+    items: { id: string; itemName: string; quantity: number; unitPrice: number; total: number; receivedQuantity: number }[];
+  } | null>(null);
+  const [loadingDetail, setLoadingDetail] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [supplierId, setSupplierId] = useState(suppliers[0]?.id ?? "");
   const [items, setItems] = useState<
@@ -148,6 +159,22 @@ export function PurchaseOrdersView({
       toast.error("Gagal membuat PO", String(err));
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const openDetail = async (po: PORow) => {
+    setLoadingDetail(true);
+    setShowDetail(true);
+    try {
+      const res = await fetch(`/api/purchase-orders/${po.id}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed");
+      setDetailPO(data.po);
+    } catch (e) {
+      toast.error("Gagal memuat detail", String(e));
+      setShowDetail(false);
+    } finally {
+      setLoadingDetail(false);
     }
   };
 
@@ -351,6 +378,14 @@ export function PurchaseOrdersView({
                   </td>
                   <td className="px-5 py-3.5">
                     <div className="flex items-center justify-end gap-1">
+                      <button
+                        type="button"
+                        onClick={() => openDetail(po)}
+                        className="h-8 px-3 inline-flex items-center justify-center gap-1 text-xs font-semibold rounded-lg text-slate-600 hover:bg-slate-100 border border-slate-200"
+                        title="Detail"
+                      >
+                        Detail
+                      </button>
                       {po.status === "ordered" && (
                         <>
                           <Button
@@ -533,6 +568,103 @@ export function PurchaseOrdersView({
             </span>
           </div>
         </form>
+      </Modal>
+
+      {/* PO Detail Modal */}
+      <Modal
+        open={showDetail}
+        onClose={() => {
+          setShowDetail(false);
+          setDetailPO(null);
+        }}
+        title={detailPO ? `PO ${detailPO.poNumber}` : "Detail PO"}
+        size="lg"
+      >
+        {loadingDetail && (
+          <div className="text-center py-8 text-sm text-slate-400">Memuat...</div>
+        )}
+        {!loadingDetail && detailPO && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div>
+                <div className="text-xs text-slate-500">Status</div>
+                <Badge
+                  className={cn("mt-1", statusColors[detailPO.status])}
+                  variant={detailPO.status === "received" ? "success" : "primary"}
+                >
+                  {statusLabels[detailPO.status]}
+                </Badge>
+              </div>
+              <div>
+                <div className="text-xs text-slate-500">Supplier</div>
+                <div className="font-semibold mt-1">{detailPO.supplierName ?? "—"}</div>
+              </div>
+            </div>
+
+            {detailPO.notes && (
+              <div className="rounded-xl bg-slate-50 p-3 text-sm">
+                <div className="text-xs text-slate-500 mb-1">Catatan</div>
+                <div className="text-slate-700">{detailPO.notes}</div>
+              </div>
+            )}
+
+            <div>
+              <h4 className="font-semibold text-sm text-slate-900 mb-2">Items</h4>
+              <div className="rounded-xl border border-slate-200 divide-y divide-slate-100">
+                {detailPO.items.map((item) => (
+                  <div key={item.id} className="p-3 flex items-center justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold text-sm text-slate-900">{item.itemName}</div>
+                      <div className="text-xs text-slate-500">
+                        {item.quantity} × {formatCurrency(item.unitPrice)}
+                        {item.receivedQuantity > 0 && (
+                          <span className="ml-2 text-green-600">
+                            (Diterima: {item.receivedQuantity})
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="font-bold text-slate-900">{formatCurrency(item.total)}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+              <span className="font-semibold text-slate-700">Total</span>
+              <span className="text-lg font-bold text-slate-900">
+                {formatCurrency(detailPO.total)}
+              </span>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => {
+                  setShowDetail(false);
+                  setDetailPO(null);
+                }}
+              >
+                Tutup
+              </Button>
+              {detailPO.status === "ordered" && (
+                <Button
+                  type="button"
+                  onClick={async () => {
+                    setShowDetail(false);
+                    await handleReceive({
+                      id: detailPO.id,
+                      poNumber: detailPO.poNumber,
+                    } as PORow);
+                  }}
+                >
+                  <CheckCircle2 size={14} /> Terima Barang
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
       </Modal>
     </>
   );
