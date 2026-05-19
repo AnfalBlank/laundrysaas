@@ -605,3 +605,22 @@ export const campaigns = sqliteTable(
 
 export type Notification = typeof notifications.$inferSelect;
 export type Campaign = typeof campaigns.$inferSelect;
+
+
+// === TENANT SECURITY SETTINGS ===
+export const tenantSecuritySettings = sqliteTable("tenant_security_settings", {
+  tenantId: text("tenant_id")
+    .primaryKey()
+    .references(() => tenants.id, { onDelete: "cascade" }),
+  twoFactorEnabled: integer("two_factor_enabled", { mode: "boolean" }).notNull().default(true),
+  auditLogEnabled: integer("audit_log_enabled", { mode: "boolean" }).notNull().default(true),
+  ipWhitelistEnabled: integer("ip_whitelist_enabled", { mode: "boolean" }).notNull().default(false),
+  sessionTimeoutEnabled: integer("session_timeout_enabled", { mode: "boolean" }).notNull().default(true),
+  sessionTimeoutMinutes: integer("session_timeout_minutes").notNull().default(60),
+  ipWhitelist: text("ip_whitelist"), // JSON array
+  updatedAt: integer("updated_at", { mode: "timestamp" })
+    .notNull()
+    .default(sql`(unixepoch())`),
+});
+
+export type TenantSecuritySettings = typeof tenantSecuritySettings.$inferSelect;

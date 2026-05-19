@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Icon3D } from "@/components/ui/icon3d";
 import { useToast } from "@/components/ui/toast";
 import { BranchesManager } from "./branches-manager";
+import { SuppliersManager } from "./suppliers-manager";
 import { cn } from "@/lib/utils";
 import {
   Building2,
@@ -24,11 +25,13 @@ import {
   Bot,
   Loader2,
   Send,
+  Truck,
 } from "lucide-react";
 
 const tabs = [
   { id: "business", label: "Profil Bisnis", icon: <Building2 size={16} />, variant: "blue" as const },
   { id: "branches", label: "Cabang", icon: <Globe size={16} />, variant: "cyan" as const },
+  { id: "suppliers", label: "Suppliers", icon: <Truck size={16} />, variant: "orange" as const },
   { id: "messaging", label: "Messaging", icon: <MessageCircleMore size={16} />, variant: "green" as const },
   { id: "appearance", label: "Branding", icon: <Palette size={16} />, variant: "pink" as const },
   { id: "integration", label: "Integrasi", icon: <Plug size={16} />, variant: "purple" as const },
@@ -223,6 +226,18 @@ export function SettingsView({ initialTenant }: { initialTenant: InitialTenant }
               </p>
             </CardHeader>
             <BranchesManager />
+          </Card>
+        )}
+
+        {active === "suppliers" && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Manajemen Supplier</CardTitle>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Daftar supplier untuk Purchase Orders. Tambah supplier sebelum buat PO.
+              </p>
+            </CardHeader>
+            <SuppliersManager />
           </Card>
         )}
 
@@ -566,45 +581,7 @@ export function SettingsView({ initialTenant }: { initialTenant: InitialTenant }
           </Card>
         )}
 
-        {active === "security" && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Keamanan</CardTitle>
-            </CardHeader>
-            <div className="p-4 sm:p-5 space-y-3">
-              {[
-                { name: "Two-Factor Authentication", desc: "Tambahan keamanan login", on: true },
-                { name: "Audit Log", desc: "Catat seluruh aktivitas user", on: true },
-                { name: "IP Whitelist", desc: "Batasi akses berdasarkan IP", on: false },
-                { name: "Session Timeout", desc: "Auto logout 60 menit", on: true },
-              ].map((opt) => (
-                <div
-                  key={opt.name}
-                  className="flex items-center justify-between rounded-xl border border-slate-200 p-3"
-                >
-                  <div>
-                    <div className="font-semibold text-sm text-slate-900">{opt.name}</div>
-                    <div className="text-xs text-slate-500">{opt.desc}</div>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      className="sr-only peer"
-                      defaultChecked={opt.on}
-                      onChange={() =>
-                        toast.success(
-                          `${opt.name} ${opt.on ? "dinonaktifkan" : "diaktifkan"}`,
-                          "Perubahan tersimpan"
-                        )
-                      }
-                    />
-                    <div className="w-11 h-6 bg-slate-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:bg-gradient-to-br peer-checked:from-primary-500 peer-checked:to-accent-500 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all" />
-                  </label>
-                </div>
-              ))}
-            </div>
-          </Card>
-        )}
+        {active === "security" && <SecurityTab toast={toast} />}
       </div>
     </div>
   );
@@ -636,5 +613,103 @@ function FieldInput({
         {hint && <span className="text-xs text-slate-400 shrink-0">{hint}</span>}
       </div>
     </div>
+  );
+}
+
+
+function SecurityTab({ toast }: { toast: ReturnType<typeof useToast> }) {
+  const [settings, setSettings] = useState<{
+    twoFactorEnabled: boolean;
+    auditLogEnabled: boolean;
+    ipWhitelistEnabled: boolean;
+    sessionTimeoutEnabled: boolean;
+    sessionTimeoutMinutes: number;
+  } | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/security")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.settings) setSettings(data.settings);
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
+  const toggle = async (key: string, value: boolean, label: string) => {
+    try {
+      const res = await fetch("/api/security", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ [key]: value }),
+      });
+      if (!res.ok) throw new Error("Failed");
+      setSettings((prev) => (prev ? { ...prev, [key]: value } : prev));
+      toast.success(`${label} ${value ? "diaktifkan" : "dinonaktifkan"}`, "Tersimpan");
+    } catch {
+      toast.error("Gagal simpan");
+    }
+  };
+
+  const options = [
+    {
+      key: "twoFactorEnabled",
+      name: "Two-Factor Authentication",
+      desc: "Tambahan keamanan login dengan OTP",
+    },
+    {
+      key: "auditLogEnabled",
+      name: "Audit Log",
+      desc: "Catat seluruh aktivitas user",
+    },
+    {
+      key: "ipWhitelistEnabled",
+      name: "IP Whitelist",
+      desc: "Batasi akses berdasarkan IP",
+    },
+    {
+      key: "sessionTimeoutEnabled",
+      name: "Session Timeout",
+      desc: "Auto logout setelah 60 menit idle",
+    },
+  ];
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Keamanan</CardTitle>
+        <p className="text-xs text-slate-500 mt-0.5">
+          Konfigurasi keamanan tenant. Perubahan tersimpan ke database.
+        </p>
+      </CardHeader>
+      <div className="p-4 sm:p-5 space-y-3">
+        {loading && <div className="text-sm text-slate-400 py-4 text-center">Memuat...</div>}
+        {!loading &&
+          settings &&
+          options.map((opt) => {
+            const value = settings[opt.key as keyof typeof settings] as boolean;
+            return (
+              <div
+                key={opt.key}
+                className="flex items-center justify-between rounded-xl border border-slate-200 p-3"
+              >
+                <div>
+                  <div className="font-semibold text-sm text-slate-900">{opt.name}</div>
+                  <div className="text-xs text-slate-500">{opt.desc}</div>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="sr-only peer"
+                    checked={value}
+                    onChange={(e) => toggle(opt.key, e.target.checked, opt.name)}
+                  />
+                  <div className="w-11 h-6 bg-slate-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:bg-gradient-to-br peer-checked:from-primary-500 peer-checked:to-accent-500 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all" />
+                </label>
+              </div>
+            );
+          })}
+      </div>
+    </Card>
   );
 }
