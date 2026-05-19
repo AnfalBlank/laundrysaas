@@ -1,10 +1,19 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { db } from "@/db/client";
-import { tenants, customers, services, orders, pickups, branches } from "@/db/schema";
-import { eq, and } from "drizzle-orm";
+import {
+  tenants,
+  customers,
+  services,
+  orders,
+  orderItems,
+  pickups,
+  branches,
+  drivers,
+} from "@/db/schema";
+import { eq, and, sql } from "drizzle-orm";
 import { getCurrentTenantId } from "@/lib/tenant";
 import { generateId } from "@/db/repositories";
-import { sql } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
 
@@ -48,6 +57,7 @@ export async function POST(req: Request) {
       tenantId,
       customer,
       businessName: tenant.name || "LaundryHub",
+      botToken: tenant.telegramBotToken,
     });
 
     // Send reply via Telegram Bot API
@@ -160,17 +170,125 @@ function extractTime(text: string): string | null {
 }
 
 /**
+ * Find the driver with the least scheduled tasks (load balancing).
+ */
+async function findAvailableDriver(tenantId: string) {
+  const drvs = await db
+    .select({
+      id: drivers.id,
+      name: drivers.name,
+      phone: drivers.phone,
+    })
+    .from(drivers)
+    .where(and(eq(drivers.tenantId, tenantId), eq(drivers.isActive, true)));
+
+  if (drvs.length === 0) return null;
+
+  // Count active tasks per driver
+  const driversWithLoad = await Promise.all(
+    drvs.map(async (drv) => {
+      const [{ count }] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(pickups)
+        .where(
+          and(
+            eq(pickups.driverId, drv.id),
+            sql`${pickups.status} in ('scheduled', 'ongoing')`
+          )
+        );
+      return { ...drv, load: Number(count) };
+    })
+  );
+
+  // Pick driver with least load
+  driversWithLoad.sort((a, b) => a.load - b.load);
+  return driversWithLoad[0];
+}
+
+/**
+ * Notify all Telegram-linked admin/owner users about a new order.
+ */
+async function notifyAdmins(
+  tenantId: string,
+  botToken: string,
+  orderInfo: {
+    invoiceNumber: string;
+    customerName: string;
+    address: string;
+    time: string;
+    weight: number;
+    total: number;
+    driverName?: string;
+  }
+) {
+  // Find all admin/owner users with telegramChatId via their customer record
+  // For now, we'll just log. In production, link users to Telegram via separate field.
+  const text =
+    `🔔 <b>Order Baru via Telegram!</b>\n\n` +
+    `Invoice: <b>${orderInfo.invoiceNumber}</b>\n` +
+    `Customer: ${orderInfo.customerName}\n` +
+    `Alamat: ${orderInfo.address}\n` +
+    `Jam pickup: ${orderInfo.time}\n` +
+    `Berat: ${orderInfo.weight} kg\n` +
+    `Total: Rp ${orderInfo.total.toLocaleString("id-ID")}\n` +
+    (orderInfo.driverName ? `Driver: ${orderInfo.driverName}\n` : "") +
+    `\nBuka dashboard untuk detail.`;
+
+  // Find admin chat IDs from a separate config (could be customer record or future field)
+  // For now, we send to admins who are also in customers table with telegramChatId
+  // (future improvement: dedicated admin_telegram_id field on users table)
+  const adminChats = await db
+    .select({
+      chatId: customers.telegramChatId,
+    })
+    .from(customers)
+    .where(
+      and(
+        eq(customers.tenantId, tenantId),
+        sql`${customers.telegramChatId} IS NOT NULL`,
+        sql`${customers.notes} LIKE '%admin%'`
+      )
+    );
+
+  for (const a of adminChats) {
+    if (!a.chatId) continue;
+    try {
+      await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: a.chatId,
+          text,
+          parse_mode: "HTML",
+        }),
+      });
+    } catch (e) {
+      console.error("Failed notify admin:", e);
+    }
+  }
+}
+
+/**
  * Create a pickup order in the database.
  */
 async function createPickupOrder(params: {
   tenantId: string;
   customerId: string;
+  customerName: string;
   address: string;
   scheduledTime: string; // HH:MM
   weight: number;
   notes?: string;
-}): Promise<{ orderId: string; invoiceNumber: string; total: number; serviceName: string } | null> {
-  const { tenantId, customerId, address, scheduledTime, weight, notes } = params;
+  botToken: string;
+}): Promise<{
+  orderId: string;
+  invoiceNumber: string;
+  total: number;
+  serviceName: string;
+  driverName: string | null;
+} | null> {
+  const { tenantId, customerId, customerName, address, scheduledTime, weight, notes, botToken } =
+    params;
 
   // Get default service (first active "regular" service or any)
   const [svc] = await db
@@ -188,8 +306,12 @@ async function createPickupOrder(params: {
     .where(and(eq(branches.tenantId, tenantId), eq(branches.isActive, true)))
     .limit(1);
 
+  // Find available driver
+  const assignedDriver = await findAvailableDriver(tenantId);
+
   const total = svc.price * weight;
   const orderId = generateId("ord");
+  const itemId = generateId("itm");
 
   // Generate invoice number
   const today = new Date();
@@ -232,23 +354,53 @@ async function createPickupOrder(params: {
     estimatedAt,
   });
 
-  // Create pickup task
+  // Create order_items entry so the service shows up in lists
+  await db.insert(orderItems).values({
+    id: itemId,
+    orderId,
+    serviceId: svc.id,
+    serviceName: svc.name,
+    qty: weight,
+    pricePerUnit: svc.price,
+    total,
+  });
+
+  // Create pickup task with driver auto-assigned
   const pickupId = generateId("pck");
   await db.insert(pickups).values({
     id: pickupId,
     tenantId,
     orderId,
+    driverId: assignedDriver?.id,
     type: "pickup",
     status: "scheduled",
     address,
     scheduledAt: scheduledDate,
   });
 
+  // Notify admins
+  await notifyAdmins(tenantId, botToken, {
+    invoiceNumber,
+    customerName,
+    address,
+    time: scheduledTime,
+    weight,
+    total,
+    driverName: assignedDriver?.name,
+  });
+
+  // Revalidate cached pages so dashboard/orders/pickup show new data immediately
+  revalidatePath("/");
+  revalidatePath("/orders");
+  revalidatePath("/pickup");
+  revalidatePath("/customers");
+
   return {
     orderId,
     invoiceNumber,
     total,
     serviceName: svc.name,
+    driverName: assignedDriver?.name ?? null,
   };
 }
 
@@ -260,8 +412,9 @@ async function handleMessage(params: {
   tenantId: string;
   customer: typeof customers.$inferSelect;
   businessName: string;
+  botToken: string;
 }): Promise<string> {
-  const { text, tenantId, customer, businessName } = params;
+  const { text, tenantId, customer, businessName, botToken } = params;
   const lower = text.toLowerCase().trim();
   const name = customer.name;
 
@@ -389,10 +542,12 @@ async function handleMessage(params: {
     const result = await createPickupOrder({
       tenantId,
       customerId: customer.id,
+      customerName: name,
       address,
       scheduledTime: time,
       weight,
       notes: `Order via Telegram. Customer: ${name}`,
+      botToken,
     });
 
     if (!result) {
@@ -406,8 +561,9 @@ async function handleMessage(params: {
       `⏰ Jam: ${time}\n` +
       `⚖️ Berat estimasi: ${weight} kg\n` +
       `💰 Total: Rp ${result.total.toLocaleString("id-ID")}\n` +
-      `📦 Layanan: ${result.serviceName}\n\n` +
-      `Driver akan datang sesuai jadwal. Anda akan dapat notifikasi saat driver berangkat.\n\n` +
+      `📦 Layanan: ${result.serviceName}\n` +
+      (result.driverName ? `👤 Driver: <b>${result.driverName}</b>\n` : "") +
+      `\nDriver akan datang sesuai jadwal. Anda akan dapat notifikasi saat driver berangkat.\n\n` +
       `Cek status kapan saja dengan kirim nomor invoice di atas. 😊`
     );
   }
