@@ -3,10 +3,13 @@ import { db } from "@/db/client";
 import { tenants } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { getCurrentTenantId } from "@/lib/tenant";
+import { requireRole } from "@/lib/api-guard";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
+  const guard = await requireRole("owner");
+  if (guard instanceof NextResponse) return guard;
   try {
     const tenantId = getCurrentTenantId();
     const [tenant] = await db
@@ -25,11 +28,12 @@ export async function GET() {
 }
 
 export async function PATCH(req: Request) {
+  const guard = await requireRole("owner");
+  if (guard instanceof NextResponse) return guard;
   try {
     const tenantId = getCurrentTenantId();
     const body = await req.json();
 
-    // Only allow updating specific fields
     const allowed: Record<string, unknown> = {};
     if (body.name !== undefined) allowed.name = body.name;
     if (body.subdomain !== undefined) allowed.subdomain = body.subdomain;

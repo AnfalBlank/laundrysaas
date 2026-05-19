@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -23,42 +24,28 @@ import {
   Moon,
 } from "lucide-react";
 
-const initialCampaigns = [
-  {
-    id: "1",
-    name: "Promo Grand Opening Cabang Utara",
-    status: "Sent" as const,
-    sent: 1284,
-    opened: 982,
-    cta: 142,
-    date: "12 Mei 2026",
-  },
-  {
-    id: "2",
-    name: "Cashback 20% Member Platinum",
-    status: "Scheduled" as const,
-    sent: 86,
-    opened: 0,
-    cta: 0,
-    date: "20 Mei 2026",
-  },
-  {
-    id: "3",
-    name: "Reminder Customer Inactive 30 hari",
-    status: "Draft" as const,
-    sent: 0,
-    opened: 0,
-    cta: 0,
-    date: "—",
-  },
-];
+interface Campaign {
+  id: string;
+  name: string;
+  segment: string | null;
+  channel: string;
+  body: string;
+  status: string;
+  scheduledAt: Date | null;
+  sentAt: Date | null;
+  recipientCount: number;
+  deliveredCount: number;
+  readCount: number;
+  conversionCount: number;
+  createdAt: Date;
+}
 
-const segments = [
-  { name: "VIP Platinum", count: 86, variant: "purple" as const, icon: <Crown size={20} /> },
-  { name: "New Customer", count: 124, variant: "cyan" as const, icon: <Star size={20} /> },
-  { name: "Repeat Order ≥ 5", count: 482, variant: "blue" as const, icon: <RotateCcw size={20} /> },
-  { name: "Inactive 30 hari", count: 142, variant: "amber" as const, icon: <Moon size={20} /> },
-];
+interface SegmentStats {
+  vip: number;
+  newCustomers: number;
+  repeat: number;
+  inactive: number;
+}
 
 const aiTemplates = [
   "🎉 Promo spesial khusus member {tier}! Dapatkan diskon 20% untuk semua layanan reguler. Berlaku sampai {date}. Pesan sekarang sebelum kehabisan!",
@@ -66,9 +53,39 @@ const aiTemplates = [
   "🌟 Promo Akhir Bulan! Cuci 5kg gratis 1kg di semua cabang. Promo terbatas, buruan order via WhatsApp ya kak!",
 ];
 
-export default function MarketingView() {
+export default function MarketingView({
+  initialCampaigns = [],
+  segments: segmentStats = { vip: 0, newCustomers: 0, repeat: 0, inactive: 0 },
+}: {
+  initialCampaigns?: Campaign[];
+  segments?: SegmentStats;
+} = {}) {
+  const router = useRouter();
   const toast = useToast();
-  const [campaigns, setCampaigns] = useState(initialCampaigns);
+
+  const segments = [
+    { name: "VIP Platinum", count: segmentStats.vip, variant: "purple" as const, icon: <Crown size={20} /> },
+    { name: "New Customer", count: segmentStats.newCustomers, variant: "cyan" as const, icon: <Star size={20} /> },
+    { name: "Repeat Order ≥ 5", count: segmentStats.repeat, variant: "blue" as const, icon: <RotateCcw size={20} /> },
+    { name: "Inactive 30 hari", count: segmentStats.inactive, variant: "amber" as const, icon: <Moon size={20} /> },
+  ];
+
+  // Display campaigns from DB
+  const displayCampaigns = initialCampaigns.map((c) => ({
+    id: c.id,
+    name: c.name,
+    status: c.status === "sent" ? "Sent" as const : c.status === "scheduled" ? "Scheduled" as const : "Draft" as const,
+    sent: c.deliveredCount,
+    opened: c.readCount,
+    cta: c.conversionCount,
+    date: c.scheduledAt
+      ? new Date(c.scheduledAt).toLocaleDateString("id-ID")
+      : c.sentAt
+      ? new Date(c.sentAt).toLocaleDateString("id-ID")
+      : new Date(c.createdAt).toLocaleDateString("id-ID"),
+  }));
+
+  const [campaigns, setCampaigns] = useState(displayCampaigns);
   const [showCampaign, setShowCampaign] = useState(false);
   const [showAI, setShowAI] = useState(false);
   const [selectedSegment, setSelectedSegment] = useState<string | null>(null);
@@ -98,28 +115,38 @@ export default function MarketingView() {
       return;
     }
     setSubmitting(true);
-    // Simulate API call
-    await new Promise((r) => setTimeout(r, 600));
 
     const segment = segments.find((s) => s.name === campForm.segment);
-    const newCampaign = {
-      id: String(Date.now()),
-      name: campForm.name,
-      status: campForm.scheduledAt ? ("Scheduled" as const) : ("Sent" as const),
-      sent: campForm.scheduledAt ? 0 : segment?.count ?? 0,
-      opened: 0,
-      cta: 0,
-      date: campForm.scheduledAt
-        ? new Date(campForm.scheduledAt).toLocaleDateString("id-ID")
-        : new Date().toLocaleDateString("id-ID"),
-    };
-    setCampaigns([newCampaign, ...campaigns]);
-    setShowCampaign(false);
-    setSubmitting(false);
-    toast.success(
-      campForm.scheduledAt ? "Campaign dijadwalkan" : "Campaign terkirim",
-      `${segment?.count ?? 0} customer akan menerima`
-    );
+    const status = campForm.scheduledAt ? "scheduled" : "sent";
+
+    try {
+      const res = await fetch("/api/campaigns", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: campForm.name,
+          segment: campForm.segment,
+          channel: "whatsapp",
+          body: campForm.message,
+          status,
+          scheduledAt: campForm.scheduledAt || undefined,
+          recipientCount: segment?.count ?? 0,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed");
+
+      toast.success(
+        campForm.scheduledAt ? "Campaign dijadwalkan" : "Campaign tersimpan",
+        `${segment?.count ?? 0} customer akan menerima`
+      );
+      setShowCampaign(false);
+      router.refresh();
+    } catch (err) {
+      toast.error("Gagal simpan campaign", String(err));
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const useAITemplate = (template: string) => {

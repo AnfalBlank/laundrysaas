@@ -1005,9 +1005,16 @@ export async function createStaff(input: {
   phone?: string;
   role: "owner" | "admin" | "staff" | "driver";
   branchId?: string;
+  password?: string;
 }) {
   const tenantId = getCurrentTenantId();
   const id = generateId("usr");
+
+  // Hash password (default to a simple one if not provided)
+  const { hashPassword } = await import("@/lib/password");
+  const plainPassword = input.password ?? "laundry123";
+  const passwordHash = await hashPassword(plainPassword);
+
   await db.insert(users).values({
     id,
     tenantId,
@@ -1016,7 +1023,7 @@ export async function createStaff(input: {
     phone: input.phone,
     role: input.role,
     branchId: input.branchId,
-    passwordHash: "$2b$10$default", // TODO: real password hashing
+    passwordHash,
   });
 
   // If role is driver, also create driver entry
@@ -1030,7 +1037,7 @@ export async function createStaff(input: {
     });
   }
 
-  return { id };
+  return { id, defaultPassword: input.password ? null : plainPassword };
 }
 
 export async function updateStaff(
@@ -1681,5 +1688,164 @@ export async function getProfitAndLoss(opts: { startDate: Date; endDate: Date })
       total: Number(s.total),
       count: Number(s.count),
     })),
+  };
+}
+
+
+// ============ NOTIFICATIONS ============
+import { notifications, campaigns } from "./schema";
+
+export async function listNotifications(opts?: { userId?: string; limit?: number; unreadOnly?: boolean }) {
+  const tenantId = getCurrentTenantId();
+  const conditions = [eq(notifications.tenantId, tenantId)];
+  if (opts?.userId) conditions.push(eq(notifications.userId, opts.userId));
+  if (opts?.unreadOnly) conditions.push(eq(notifications.isRead, false));
+
+  return db
+    .select()
+    .from(notifications)
+    .where(and(...conditions))
+    .orderBy(desc(notifications.createdAt))
+    .limit(opts?.limit ?? 50);
+}
+
+export async function createNotification(input: {
+  userId?: string;
+  type: "order" | "payment" | "stock" | "pickup" | "system" | "marketing";
+  title: string;
+  message: string;
+  link?: string;
+}) {
+  const tenantId = getCurrentTenantId();
+  const id = generateId("notif");
+  await db.insert(notifications).values({
+    id,
+    tenantId,
+    userId: input.userId,
+    type: input.type,
+    title: input.title,
+    message: input.message,
+    link: input.link,
+  });
+  return { id };
+}
+
+export async function markNotificationRead(id: string) {
+  await db
+    .update(notifications)
+    .set({ isRead: true })
+    .where(eq(notifications.id, id));
+}
+
+export async function markAllNotificationsRead(userId?: string) {
+  const tenantId = getCurrentTenantId();
+  const conditions = [eq(notifications.tenantId, tenantId), eq(notifications.isRead, false)];
+  if (userId) conditions.push(eq(notifications.userId, userId));
+  await db.update(notifications).set({ isRead: true }).where(and(...conditions));
+}
+
+export async function getUnreadNotificationCount(userId?: string) {
+  const tenantId = getCurrentTenantId();
+  const conditions = [eq(notifications.tenantId, tenantId), eq(notifications.isRead, false)];
+  if (userId) conditions.push(eq(notifications.userId, userId));
+  const [{ count }] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(notifications)
+    .where(and(...conditions));
+  return Number(count ?? 0);
+}
+
+// ============ CAMPAIGNS ============
+export async function listCampaigns(limit = 50) {
+  const tenantId = getCurrentTenantId();
+  return db
+    .select()
+    .from(campaigns)
+    .where(eq(campaigns.tenantId, tenantId))
+    .orderBy(desc(campaigns.createdAt))
+    .limit(limit);
+}
+
+export async function createCampaign(input: {
+  name: string;
+  segment?: string;
+  channel: "whatsapp" | "telegram" | "email" | "sms";
+  body: string;
+  status?: "draft" | "scheduled" | "sending" | "sent" | "cancelled";
+  scheduledAt?: Date;
+  recipientCount?: number;
+}) {
+  const tenantId = getCurrentTenantId();
+  const id = generateId("camp");
+  await db.insert(campaigns).values({
+    id,
+    tenantId,
+    name: input.name,
+    segment: input.segment,
+    channel: input.channel,
+    body: input.body,
+    status: input.status ?? "draft",
+    scheduledAt: input.scheduledAt,
+    recipientCount: input.recipientCount ?? 0,
+  });
+  return { id };
+}
+
+export async function updateCampaignStatus(
+  id: string,
+  status: "draft" | "scheduled" | "sending" | "sent" | "cancelled"
+) {
+  const tenantId = getCurrentTenantId();
+  await db
+    .update(campaigns)
+    .set({ status, ...(status === "sent" ? { sentAt: new Date() } : {}) })
+    .where(and(eq(campaigns.id, id), eq(campaigns.tenantId, tenantId)));
+}
+
+/**
+ * Compute customer segment counts from real data.
+ */
+export async function getSegmentStats() {
+  const tenantId = getCurrentTenantId();
+  const [vip] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(customers)
+    .where(and(eq(customers.tenantId, tenantId), eq(customers.tier, "platinum")));
+
+  const thirtyDaysAgo = Math.floor((Date.now() - 30 * 24 * 60 * 60 * 1000) / 1000);
+
+  const [newCustomers] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(customers)
+    .where(
+      and(
+        eq(customers.tenantId, tenantId),
+        sql`${customers.createdAt} >= ${thirtyDaysAgo}`
+      )
+    );
+
+  const [repeat] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(customers)
+    .where(and(eq(customers.tenantId, tenantId), sql`${customers.totalOrders} >= 5`));
+
+  const [inactive] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(customers)
+    .where(
+      and(
+        eq(customers.tenantId, tenantId),
+        sql`${customers.id} NOT IN (
+          SELECT DISTINCT customer_id FROM orders
+          WHERE tenant_id = ${tenantId} AND created_at >= ${thirtyDaysAgo}
+        )`
+      )
+    );
+
+  return {
+    vip: Number(vip?.count ?? 0),
+    newCustomers: Number(newCustomers?.count ?? 0),
+    repeat: Number(repeat?.count ?? 0),
+    inactive: Number(inactive?.count ?? 0),
   };
 }

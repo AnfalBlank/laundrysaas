@@ -538,3 +538,70 @@ export type PurchaseOrder = typeof purchaseOrders.$inferSelect;
 export type PurchaseOrderItem = typeof purchaseOrderItems.$inferSelect;
 export type Expense = typeof expenses.$inferSelect;
 export type ExpenseCategory = typeof expenseCategories.$inferSelect;
+
+
+// === NOTIFICATIONS (persistent in-app notifications) ===
+export const notifications = sqliteTable(
+  "notifications",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    userId: text("user_id").references(() => users.id, { onDelete: "cascade" }),
+    type: text("type", {
+      enum: ["order", "payment", "stock", "pickup", "system", "marketing"],
+    })
+      .notNull()
+      .default("system"),
+    title: text("title").notNull(),
+    message: text("message").notNull(),
+    link: text("link"),
+    isRead: integer("is_read", { mode: "boolean" }).notNull().default(false),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`),
+  },
+  (t) => ({
+    tenantIdx: index("notif_tenant_idx").on(t.tenantId),
+    userIdx: index("notif_user_idx").on(t.userId, t.isRead),
+  })
+);
+
+// === MARKETING CAMPAIGNS ===
+export const campaigns = sqliteTable(
+  "campaigns",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    segment: text("segment"),
+    channel: text("channel", { enum: ["whatsapp", "telegram", "email", "sms"] })
+      .notNull()
+      .default("whatsapp"),
+    body: text("body").notNull(),
+    status: text("status", {
+      enum: ["draft", "scheduled", "sending", "sent", "cancelled"],
+    })
+      .notNull()
+      .default("draft"),
+    scheduledAt: integer("scheduled_at", { mode: "timestamp" }),
+    sentAt: integer("sent_at", { mode: "timestamp" }),
+    recipientCount: integer("recipient_count").notNull().default(0),
+    deliveredCount: integer("delivered_count").notNull().default(0),
+    readCount: integer("read_count").notNull().default(0),
+    conversionCount: integer("conversion_count").notNull().default(0),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`),
+  },
+  (t) => ({
+    tenantIdx: index("campaigns_tenant_idx").on(t.tenantId),
+    statusIdx: index("campaigns_status_idx").on(t.tenantId, t.status),
+  })
+);
+
+export type Notification = typeof notifications.$inferSelect;
+export type Campaign = typeof campaigns.$inferSelect;

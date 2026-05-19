@@ -5,10 +5,14 @@ import {
   listExpenseCategories,
   getExpenseSummary,
 } from "@/db/repositories";
+import { requireRole, requirePermission } from "@/lib/api-guard";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
+  // Only owner can see expenses (financial data)
+  const guard = await requireRole("owner");
+  if (guard instanceof NextResponse) return guard;
   try {
     const { searchParams } = new URL(req.url);
     const startStr = searchParams.get("start");
@@ -30,6 +34,8 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
+  const guard = await requirePermission("expenses:create");
+  if (guard instanceof NextResponse) return guard;
   try {
     const body = await req.json();
     if (!body.title || !body.amount) {
