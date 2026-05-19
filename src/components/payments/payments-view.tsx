@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -43,6 +44,7 @@ export function PaymentsView({
   outstanding: { total: number; count: number };
 }) {
   const toast = useToast();
+  const router = useRouter();
 
   const methods = ["cash", "qris", "transfer", "ewallet"].map((m) => {
     const found = summary.find((s) => s.method === m);
@@ -69,15 +71,40 @@ export function PaymentsView({
     toast.success("Export berhasil", `${payments.length} pembayaran`);
   };
 
-  const handleSendReminder = () => {
+  const handleSendReminder = async () => {
     if (outstanding.count === 0) {
       toast.info("Tidak ada tagihan", "Semua sudah lunas");
       return;
     }
-    toast.success(
-      `Reminder dikirim`,
-      `${outstanding.count} customer akan menerima notifikasi WhatsApp`
-    );
+    try {
+      const res = await fetch("/api/payments/reminder", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed");
+      toast.success(
+        "Reminder dikirim",
+        `${data.sentCount} reminder berhasil dikirim ke customer`
+      );
+    } catch (err) {
+      toast.error("Gagal kirim reminder", String(err));
+    }
+  };
+
+  const handleRefund = async (paymentId: string, invoice: string) => {
+    if (!confirm(`Refund pembayaran untuk invoice ${invoice}?\n\nIni akan membuat record refund dan update payment status order.`)) return;
+    const reason = window.prompt("Alasan refund (opsional):") ?? undefined;
+    try {
+      const res = await fetch(`/api/payments/${paymentId}/refund`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed");
+      toast.success("Refund tercatat", `Sebesar Rp ${Math.abs(data.amount).toLocaleString("id-ID")}`);
+      router.refresh();
+    } catch (err) {
+      toast.error("Gagal refund", String(err));
+    }
   };
 
   return (
@@ -155,6 +182,7 @@ export function PaymentsView({
                 <th className="px-5 py-3.5">Tanggal</th>
                 <th className="px-5 py-3.5">Status</th>
                 <th className="px-5 py-3.5 text-right">Jumlah</th>
+                <th className="px-5 py-3.5 text-right">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -184,14 +212,29 @@ export function PaymentsView({
                       </Badge>
                     </td>
                     <td className="px-5 py-3.5 text-right font-bold text-slate-900 whitespace-nowrap">
-                      {formatCurrency(p.amount)}
+                      {p.amount < 0 ? (
+                        <span className="text-red-600">{formatCurrency(p.amount)}</span>
+                      ) : (
+                        formatCurrency(p.amount)
+                      )}
+                    </td>
+                    <td className="px-5 py-3.5 text-right">
+                      {p.amount > 0 && p.paymentStatus === "paid" && (
+                        <button
+                          type="button"
+                          onClick={() => handleRefund(p.id, p.invoice)}
+                          className="text-[11px] font-semibold text-red-600 hover:text-red-700 hover:underline"
+                        >
+                          Refund
+                        </button>
+                      )}
                     </td>
                   </tr>
                 );
               })}
               {payments.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-5 py-12 text-center text-sm text-slate-400">
+                  <td colSpan={7} className="px-5 py-12 text-center text-sm text-slate-400">
                     Belum ada pembayaran
                   </td>
                 </tr>

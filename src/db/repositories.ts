@@ -426,11 +426,15 @@ export async function createOrder(input: {
   customerPhone?: string;
   customerAddress?: string;
   branchId?: string;
-  serviceId: string;
-  qty: number;
+  // Single-item (legacy):
+  serviceId?: string;
+  qty?: number;
+  // Multi-item (new):
+  items?: { serviceId: string; qty: number }[];
   pickupType: "walk_in" | "pickup";
   pickupAddress?: string;
   isExpress?: boolean;
+  discount?: number;
   notes?: string;
 }) {
   const tenantId = getCurrentTenantId();
@@ -458,17 +462,61 @@ export async function createOrder(input: {
   }
   if (!customerId) throw new Error("Customer required");
 
-  // Get service for price
-  const [svc] = await db
+  // Normalize items: support both single (serviceId+qty) and multi (items[])
+  const itemsInput =
+    input.items && input.items.length > 0
+      ? input.items
+      : input.serviceId && input.qty
+      ? [{ serviceId: input.serviceId, qty: input.qty }]
+      : [];
+
+  if (itemsInput.length === 0) throw new Error("At least one service item required");
+
+  // Fetch all services
+  const serviceIds = itemsInput.map((i) => i.serviceId);
+  const svcRows = await db
     .select()
     .from(services)
-    .where(and(eq(services.tenantId, tenantId), eq(services.id, input.serviceId)))
-    .limit(1);
-  if (!svc) throw new Error("Service not found");
+    .where(and(eq(services.tenantId, tenantId), sql`${services.id} in ${serviceIds}`));
 
-  const total = svc.price * input.qty;
+  if (svcRows.length === 0) throw new Error("Services not found");
+
+  // Compute subtotal + max duration
+  let subtotal = 0;
+  let maxDuration = 0;
+  let firstWeight: number | null = null;
+  const itemsToInsert: {
+    id: string;
+    serviceId: string;
+    serviceName: string;
+    qty: number;
+    pricePerUnit: number;
+    total: number;
+  }[] = [];
+
+  for (const it of itemsInput) {
+    const svc = svcRows.find((s) => s.id === it.serviceId);
+    if (!svc) throw new Error(`Service ${it.serviceId} not found`);
+    const itemTotal = svc.price * it.qty;
+    subtotal += itemTotal;
+    if (svc.durationDays > maxDuration) maxDuration = svc.durationDays;
+    if (svc.pricingType === "per_kg" && firstWeight === null) firstWeight = it.qty;
+    itemsToInsert.push({
+      id: generateId("itm"),
+      serviceId: svc.id,
+      serviceName: svc.name,
+      qty: it.qty,
+      pricePerUnit: svc.price,
+      total: itemTotal,
+    });
+  }
+
+  // Express surcharge: 50% if isExpress
+  const expressSurcharge = input.isExpress ? Math.floor(subtotal * 0.5) : 0;
+  const discount = input.discount ?? 0;
+  const total = Math.max(0, subtotal + expressSurcharge - discount);
+
   const orderId = generateId("ord");
-  const itemId = generateId("itm");
 
   // Generate invoice number
   const today = new Date();
@@ -483,7 +531,7 @@ export async function createOrder(input: {
   const invoiceNumber = `INV-${datePart}-${String(Number(count) + 1).padStart(3, "0")}`;
 
   const estimatedAt = new Date();
-  estimatedAt.setDate(estimatedAt.getDate() + (input.isExpress ? 1 : svc.durationDays));
+  estimatedAt.setDate(estimatedAt.getDate() + (input.isExpress ? 1 : maxDuration || 2));
 
   // Insert order
   await db.insert(orders).values({
@@ -498,22 +546,25 @@ export async function createOrder(input: {
     pickupAddress: input.pickupAddress,
     isExpress: input.isExpress ?? false,
     notes: input.notes,
-    weight: svc.pricingType === "per_kg" ? input.qty : null,
-    subtotal: total,
+    weight: firstWeight,
+    subtotal,
+    discount,
     total,
     estimatedAt,
   });
 
-  // Insert order item
-  await db.insert(orderItems).values({
-    id: itemId,
-    orderId,
-    serviceId: svc.id,
-    serviceName: svc.name,
-    qty: input.qty,
-    pricePerUnit: svc.price,
-    total,
-  });
+  // Insert order items (multi-item)
+  for (const item of itemsToInsert) {
+    await db.insert(orderItems).values({
+      id: item.id,
+      orderId,
+      serviceId: item.serviceId,
+      serviceName: item.serviceName,
+      qty: item.qty,
+      pricePerUnit: item.pricePerUnit,
+      total: item.total,
+    });
+  }
 
   // Send notification to customer (order received) — best-effort
   try {
@@ -661,6 +712,62 @@ export async function recordPayment(input: {
   }
 
   return { id: payId };
+}
+
+/**
+ * Refund a payment. Creates a negative-amount payment record.
+ */
+export async function refundPayment(input: {
+  paymentId: string;
+  amount?: number; // defaults to original payment amount (full refund)
+  reason?: string;
+}) {
+  // Find the original payment
+  const [original] = await db
+    .select()
+    .from(payments)
+    .where(eq(payments.id, input.paymentId))
+    .limit(1);
+
+  if (!original) throw new Error("Payment not found");
+
+  const refundAmount = input.amount ?? original.amount;
+  if (refundAmount <= 0) throw new Error("Refund amount must be positive");
+  if (refundAmount > original.amount) throw new Error("Refund cannot exceed original");
+
+  // Create negative payment as refund
+  const refundId = generateId("pay");
+  await db.insert(payments).values({
+    id: refundId,
+    orderId: original.orderId,
+    amount: -refundAmount,
+    method: original.method,
+    reference: `REFUND ${input.paymentId}${input.reason ? ` (${input.reason})` : ""}`,
+  });
+
+  // Recalculate order payment status
+  const [{ paid }] = await db
+    .select({ paid: sql<number>`coalesce(sum(${payments.amount}), 0)` })
+    .from(payments)
+    .where(eq(payments.orderId, original.orderId));
+
+  const [order] = await db
+    .select({ total: orders.total })
+    .from(orders)
+    .where(eq(orders.id, original.orderId));
+
+  if (order) {
+    let status: "unpaid" | "partial" | "paid" = "unpaid";
+    if (Number(paid) >= order.total) status = "paid";
+    else if (Number(paid) > 0) status = "partial";
+
+    await db
+      .update(orders)
+      .set({ paymentStatus: status, updatedAt: new Date() })
+      .where(eq(orders.id, original.orderId));
+  }
+
+  return { id: refundId, amount: -refundAmount };
 }
 
 // Create customer
