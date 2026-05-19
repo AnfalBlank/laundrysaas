@@ -10,6 +10,7 @@ import {
   pickups,
   branches,
   drivers,
+  messages,
 } from "@/db/schema";
 import { eq, and, sql } from "drizzle-orm";
 import { getCurrentTenantId } from "@/lib/tenant";
@@ -51,6 +52,17 @@ export async function POST(req: Request) {
     // Find or create customer by Telegram chatId
     const customer = await findOrCreateCustomer(tenantId, chatId, firstName, username);
 
+    // Save incoming message
+    await db.insert(messages).values({
+      id: generateId("msg"),
+      tenantId,
+      customerId: customer.id,
+      direction: "incoming",
+      channel: "telegram",
+      body: text,
+      isBot: false,
+    });
+
     // Detect intent and reply (may also create order)
     const reply = await handleMessage({
       text,
@@ -58,6 +70,17 @@ export async function POST(req: Request) {
       customer,
       businessName: tenant.name || "LaundryHub",
       botToken: tenant.telegramBotToken,
+    });
+
+    // Save outgoing reply
+    await db.insert(messages).values({
+      id: generateId("msg"),
+      tenantId,
+      customerId: customer.id,
+      direction: "outgoing",
+      channel: "telegram",
+      body: reply,
+      isBot: true,
     });
 
     // Send reply via Telegram Bot API

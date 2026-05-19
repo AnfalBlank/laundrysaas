@@ -624,3 +624,30 @@ export const tenantSecuritySettings = sqliteTable("tenant_security_settings", {
 });
 
 export type TenantSecuritySettings = typeof tenantSecuritySettings.$inferSelect;
+
+
+// === MESSAGES (chat history per customer) ===
+export const messages = sqliteTable(
+  "messages",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    customerId: text("customer_id").references(() => customers.id, { onDelete: "cascade" }),
+    direction: text("direction", { enum: ["incoming", "outgoing"] }).notNull(),
+    channel: text("channel", { enum: ["whatsapp", "telegram"] }).notNull().default("telegram"),
+    body: text("body").notNull(),
+    isBot: integer("is_bot", { mode: "boolean" }).notNull().default(false),
+    isRead: integer("is_read", { mode: "boolean" }).notNull().default(false),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`),
+  },
+  (t) => ({
+    tenantIdx: index("messages_tenant_idx").on(t.tenantId),
+    customerIdx: index("messages_customer_idx").on(t.customerId, t.createdAt),
+  })
+);
+
+export type Message = typeof messages.$inferSelect;

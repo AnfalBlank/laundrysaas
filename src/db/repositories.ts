@@ -11,6 +11,7 @@ import {
   inventory,
   whatsappTemplates,
   users,
+  tenants,
 } from "./schema";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { getCurrentTenantId } from "@/lib/tenant";
@@ -1848,4 +1849,187 @@ export async function getSegmentStats() {
     repeat: Number(repeat?.count ?? 0),
     inactive: Number(inactive?.count ?? 0),
   };
+}
+
+
+// ============ MESSAGES / CHAT ============
+import { messages } from "./schema";
+// Note: `tenants` and `customers` already imported earlier in file
+
+
+/**
+ * List recent conversations grouped by customer (latest message + unread count).
+ */
+export async function listChatConversations(limit = 20) {
+  const tenantId = getCurrentTenantId();
+
+  // Get latest message per customer
+  const rows = await db
+    .select({
+      messageId: messages.id,
+      customerId: messages.customerId,
+      direction: messages.direction,
+      body: messages.body,
+      isBot: messages.isBot,
+      createdAt: messages.createdAt,
+      customerName: customers.name,
+      customerPhone: customers.phone,
+      telegramChatId: customers.telegramChatId,
+    })
+    .from(messages)
+    .leftJoin(customers, eq(messages.customerId, customers.id))
+    .where(eq(messages.tenantId, tenantId))
+    .orderBy(desc(messages.createdAt))
+    .limit(200);
+
+  // Group by customerId, keep first (latest) per customer
+  const conversations = new Map<
+    string,
+    {
+      customerId: string;
+      customerName: string;
+      customerPhone: string;
+      telegramChatId: string | null;
+      lastMessage: string;
+      lastTime: Date;
+      isBot: boolean;
+      unread: number;
+    }
+  >();
+
+  for (const r of rows) {
+    if (!r.customerId) continue;
+    if (!conversations.has(r.customerId)) {
+      conversations.set(r.customerId, {
+        customerId: r.customerId,
+        customerName: r.customerName ?? "Customer",
+        customerPhone: r.customerPhone ?? "",
+        telegramChatId: r.telegramChatId,
+        lastMessage: r.body,
+        lastTime: r.createdAt,
+        isBot: r.isBot,
+        unread: 0,
+      });
+    }
+  }
+
+  // Count unread per customer (incoming + isRead=false)
+  const unreadCounts = await db
+    .select({
+      customerId: messages.customerId,
+      count: sql<number>`count(*)`,
+    })
+    .from(messages)
+    .where(
+      and(
+        eq(messages.tenantId, tenantId),
+        eq(messages.direction, "incoming"),
+        eq(messages.isRead, false)
+      )
+    )
+    .groupBy(messages.customerId);
+
+  for (const u of unreadCounts) {
+    if (!u.customerId) continue;
+    const conv = conversations.get(u.customerId);
+    if (conv) conv.unread = Number(u.count);
+  }
+
+  return Array.from(conversations.values()).slice(0, limit);
+}
+
+/**
+ * Get message thread for a specific customer.
+ */
+export async function getChatThread(customerId: string, limit = 50) {
+  const tenantId = getCurrentTenantId();
+  return db
+    .select({
+      id: messages.id,
+      direction: messages.direction,
+      body: messages.body,
+      isBot: messages.isBot,
+      createdAt: messages.createdAt,
+    })
+    .from(messages)
+    .where(and(eq(messages.tenantId, tenantId), eq(messages.customerId, customerId)))
+    .orderBy(messages.createdAt)
+    .limit(limit);
+}
+
+export async function markCustomerMessagesRead(customerId: string) {
+  const tenantId = getCurrentTenantId();
+  await db
+    .update(messages)
+    .set({ isRead: true })
+    .where(
+      and(
+        eq(messages.tenantId, tenantId),
+        eq(messages.customerId, customerId),
+        eq(messages.direction, "incoming")
+      )
+    );
+}
+
+export async function sendChatMessage(input: {
+  customerId: string;
+  body: string;
+}) {
+  const tenantId = getCurrentTenantId();
+
+  // Get customer info
+  const [c] = await db
+    .select({
+      telegramChatId: customers.telegramChatId,
+      phone: customers.phone,
+    })
+    .from(customers)
+    .where(and(eq(customers.tenantId, tenantId), eq(customers.id, input.customerId)))
+    .limit(1);
+
+  if (!c) throw new Error("Customer not found");
+
+  // Get tenant config
+  const [tenant] = await db
+    .select({
+      messagingChannel: tenants.messagingChannel,
+      whatsappToken: tenants.whatsappToken,
+      telegramBotToken: tenants.telegramBotToken,
+    })
+    .from(tenants)
+    .where(eq(tenants.id, tenantId))
+    .limit(1);
+
+  if (!tenant) throw new Error("Tenant not found");
+
+  const channel = tenant.messagingChannel as "whatsapp" | "telegram";
+
+  // Save outgoing message
+  const id = generateId("msg");
+  await db.insert(messages).values({
+    id,
+    tenantId,
+    customerId: input.customerId,
+    direction: "outgoing",
+    channel,
+    body: input.body,
+    isBot: false,
+  });
+
+  // Send via channel
+  const { sendMessage } = await import("@/lib/messaging");
+  const target = channel === "telegram" ? c.telegramChatId : c.phone;
+  if (!target || (channel === "whatsapp" && c.phone.startsWith("tg:"))) {
+    return { id, sent: false, error: "Customer not reachable on this channel" };
+  }
+
+  const result = await sendMessage({
+    to: target,
+    text: input.body,
+    channel,
+    whatsappToken: tenant.whatsappToken ?? undefined,
+    telegramBotToken: tenant.telegramBotToken ?? undefined,
+  });
+
+  return { id, sent: result.success, error: result.error };
 }

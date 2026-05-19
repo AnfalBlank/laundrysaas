@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,6 +33,25 @@ interface Template {
   sentCount: number;
 }
 
+interface Conversation {
+  customerId: string;
+  customerName: string;
+  customerPhone: string;
+  telegramChatId: string | null;
+  lastMessage: string;
+  lastTime: Date;
+  isBot: boolean;
+  unread: number;
+}
+
+interface ChatMessage {
+  id: string;
+  direction: "incoming" | "outgoing";
+  body: string;
+  isBot: boolean;
+  createdAt: Date;
+}
+
 const templateIconMap: Record<
   string,
   { icon: React.ReactNode; variant: Parameters<typeof Icon3D>[0]["variant"] }
@@ -45,7 +64,7 @@ const templateIconMap: Record<
   invoice_send: { icon: <ReceiptText size={22} />, variant: "purple" },
 };
 
-const messages = [
+const messages_dummy = [
   { fromCustomer: true, text: "Halo, saya mau pickup laundry dong", time: "10:24" },
   {
     fromCustomer: false,
@@ -62,13 +81,82 @@ const messages = [
   },
 ];
 
-export function WhatsappView({ templates, channel = "whatsapp" }: { templates: Template[]; channel?: string }) {
-  const [activeChat, setActiveChat] = useState(chats[0].id);
+export function WhatsappView({
+  templates,
+  channel = "whatsapp",
+  conversations = [],
+}: {
+  templates: Template[];
+  channel?: string;
+  conversations?: Conversation[];
+}) {
+  const [activeChat, setActiveChat] = useState<string | null>(
+    conversations[0]?.customerId ?? null
+  );
+  const [thread, setThread] = useState<ChatMessage[]>([]);
+  const [loadingThread, setLoadingThread] = useState(false);
   const [message, setMessage] = useState("");
+  const [sending, setSending] = useState(false);
 
   const isWhatsApp = channel === "whatsapp";
   const channelLabel = isWhatsApp ? "WhatsApp" : "Telegram";
-  const channelColor = isWhatsApp ? "from-green-400 to-emerald-600" : "from-blue-400 to-blue-600";
+
+  // Load thread when activeChat changes
+  useEffect(() => {
+    if (!activeChat) return;
+    setLoadingThread(true);
+    fetch(`/api/chat/${activeChat}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.messages) {
+          setThread(
+            data.messages.map((m: { id: string; direction: string; body: string; isBot: number; createdAt: string }) => ({
+              id: m.id,
+              direction: m.direction as "incoming" | "outgoing",
+              body: m.body,
+              isBot: Boolean(m.isBot),
+              createdAt: new Date(m.createdAt),
+            }))
+          );
+        }
+      })
+      .finally(() => setLoadingThread(false));
+  }, [activeChat]);
+
+  const activeConv = conversations.find((c) => c.customerId === activeChat);
+
+  const sendReply = async () => {
+    if (!message.trim() || !activeChat) return;
+    setSending(true);
+    const body = message;
+    setMessage("");
+    // Optimistic update
+    setThread((prev) => [
+      ...prev,
+      {
+        id: "temp_" + Date.now(),
+        direction: "outgoing",
+        body,
+        isBot: false,
+        createdAt: new Date(),
+      },
+    ]);
+    try {
+      const res = await fetch(`/api/chat/${activeChat}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ body }),
+      });
+      const data = await res.json();
+      if (!data.sent) {
+        alert("Pesan tersimpan tapi gagal kirim: " + (data.error || "Unknown"));
+      }
+    } catch {
+      alert("Gagal kirim pesan");
+    } finally {
+      setSending(false);
+    }
+  };
 
   return (
     <>
@@ -248,31 +336,49 @@ export function WhatsappView({ templates, channel = "whatsapp" }: { templates: T
           <CardHeader>
             <CardTitle>Inbox Customer</CardTitle>
             <p className="text-xs text-slate-500 mt-0.5">
-              {chats.filter((c) => c.unread > 0).length} percakapan baru via {channelLabel}
+              {conversations.filter((c) => c.unread > 0).length} percakapan baru via {channelLabel}
             </p>
           </CardHeader>
           <div className="divide-y divide-slate-100 max-h-[420px] overflow-y-auto">
-            {chats.map((c) => (
+            {conversations.length === 0 && (
+              <div className="px-4 py-8 text-center text-sm text-slate-400">
+                Belum ada percakapan.<br />
+                <span className="text-xs">Customer chat ke bot akan muncul di sini.</span>
+              </div>
+            )}
+            {conversations.map((c) => (
               <button
-                key={c.id}
-                onClick={() => setActiveChat(c.id)}
+                key={c.customerId}
+                onClick={() => setActiveChat(c.customerId)}
                 className={cn(
                   "w-full text-left px-4 py-3 flex items-start gap-3 hover:bg-slate-50 transition-colors",
-                  activeChat === c.id && "bg-primary-50/50"
+                  activeChat === c.customerId && "bg-primary-50/50"
                 )}
               >
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-400 to-emerald-600 flex items-center justify-center text-white font-bold text-sm shrink-0">
-                  {c.name.charAt(0)}
+                <div
+                  className={cn(
+                    "w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm shrink-0",
+                    isWhatsApp
+                      ? "bg-gradient-to-br from-green-400 to-emerald-600"
+                      : "bg-gradient-to-br from-blue-400 to-blue-600"
+                  )}
+                >
+                  {c.customerName.charAt(0).toUpperCase()}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2">
                     <span className="font-semibold text-sm text-slate-900 truncate">
-                      {c.name}
+                      {c.customerName}
                     </span>
-                    <span className="text-[10px] text-slate-400 shrink-0">{c.time}</span>
+                    <span className="text-[10px] text-slate-400 shrink-0">
+                      {new Date(c.lastTime).toLocaleTimeString("id-ID", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </span>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    {c.isAi && <Bot size={11} className="text-primary-500 shrink-0" />}
+                    {c.isBot && <Bot size={11} className="text-primary-500 shrink-0" />}
                     <p className="text-xs text-slate-500 truncate">{c.lastMessage}</p>
                   </div>
                 </div>
@@ -289,11 +395,20 @@ export function WhatsappView({ templates, channel = "whatsapp" }: { templates: T
         <Card className="lg:col-span-2 flex flex-col overflow-hidden order-1 lg:order-2">
           <CardHeader className="flex items-center justify-between flex-row gap-3 space-y-0">
             <div className="flex items-center gap-3 min-w-0">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-400 to-emerald-600 flex items-center justify-center text-white font-bold shrink-0">
-                A
+              <div
+                className={cn(
+                  "w-10 h-10 rounded-full flex items-center justify-center text-white font-bold shrink-0",
+                  isWhatsApp
+                    ? "bg-gradient-to-br from-green-400 to-emerald-600"
+                    : "bg-gradient-to-br from-blue-400 to-blue-600"
+                )}
+              >
+                {(activeConv?.customerName ?? "?").charAt(0).toUpperCase()}
               </div>
               <div className="min-w-0">
-                <div className="font-semibold text-slate-900 truncate">Andi Pratama</div>
+                <div className="font-semibold text-slate-900 truncate">
+                  {activeConv?.customerName ?? "Pilih percakapan"}
+                </div>
                 <div className="text-xs text-slate-500 flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-green-500" /> Online · Bot Aktif
                 </div>
@@ -311,83 +426,91 @@ export function WhatsappView({ templates, channel = "whatsapp" }: { templates: T
                 "radial-gradient(circle at 20% 20%, rgba(96,165,250,0.05) 0px, transparent 50%), radial-gradient(circle at 80% 70%, rgba(6,182,212,0.05) 0px, transparent 50%)",
             }}
           >
-            {messages.map((m, i) => (
-              <div
-                key={i}
-                className={cn("flex", m.fromCustomer ? "justify-start" : "justify-end")}
-              >
-                <div
-                  className={cn(
-                    "max-w-[80%] sm:max-w-[75%] rounded-2xl px-3.5 py-2 text-sm",
-                    m.fromCustomer
-                      ? "bg-white border border-slate-200 text-slate-800 rounded-bl-sm"
-                      : cn(
-                          "text-white rounded-br-sm shadow-md",
-                          isWhatsApp
-                            ? "bg-gradient-to-br from-green-500 to-emerald-600 shadow-green-500/20"
-                            : "bg-gradient-to-br from-blue-500 to-blue-600 shadow-blue-500/20"
-                        )
-                  )}
-                >
-                  {m.isBot && (
-                    <div className="flex items-center gap-1 text-[10px] opacity-90 mb-0.5">
-                      <Bot size={10} /> AI Bot
-                    </div>
-                  )}
-                  <div>{m.text}</div>
+            {!activeChat && (
+              <div className="text-center text-sm text-slate-400 py-12">
+                Pilih percakapan dari Inbox untuk membaca chat history
+              </div>
+            )}
+            {loadingThread && (
+              <div className="text-center text-sm text-slate-400 py-8">Memuat...</div>
+            )}
+            {!loadingThread &&
+              thread.map((m) => {
+                const fromCustomer = m.direction === "incoming";
+                return (
                   <div
-                    className={cn(
-                      "text-[10px] mt-1 inline-flex items-center gap-1",
-                      m.fromCustomer ? "text-slate-400" : "text-white/70"
-                    )}
+                    key={m.id}
+                    className={cn("flex", fromCustomer ? "justify-start" : "justify-end")}
                   >
-                    {m.time}
-                    {!m.fromCustomer && (
-                      <span className="inline-flex">
-                        <Check size={10} className="-mr-1.5" />
-                        <Check size={10} />
-                      </span>
-                    )}
+                    <div
+                      className={cn(
+                        "max-w-[80%] sm:max-w-[75%] rounded-2xl px-3.5 py-2 text-sm",
+                        fromCustomer
+                          ? "bg-white border border-slate-200 text-slate-800 rounded-bl-sm"
+                          : cn(
+                              "text-white rounded-br-sm shadow-md",
+                              isWhatsApp
+                                ? "bg-gradient-to-br from-green-500 to-emerald-600 shadow-green-500/20"
+                                : "bg-gradient-to-br from-blue-500 to-blue-600 shadow-blue-500/20"
+                            )
+                      )}
+                    >
+                      {m.isBot && !fromCustomer && (
+                        <div className="flex items-center gap-1 text-[10px] opacity-90 mb-0.5">
+                          <Bot size={10} /> AI Bot
+                        </div>
+                      )}
+                      <div
+                        className="whitespace-pre-wrap"
+                        dangerouslySetInnerHTML={{
+                          __html: m.body
+                            .replace(/<b>(.*?)<\/b>/g, "<strong>$1</strong>")
+                            .replace(/<i>(.*?)<\/i>/g, "<em>$1</em>"),
+                        }}
+                      />
+                      <div
+                        className={cn(
+                          "text-[10px] mt-1 inline-flex items-center gap-1",
+                          fromCustomer ? "text-slate-400" : "text-white/70"
+                        )}
+                      >
+                        {new Date(m.createdAt).toLocaleTimeString("id-ID", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                        {!fromCustomer && (
+                          <span className="inline-flex">
+                            <Check size={10} className="-mr-1.5" />
+                            <Check size={10} />
+                          </span>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="px-4 sm:px-5 py-3 border-t border-slate-100 bg-gradient-to-br from-primary-50/40 to-accent-50/40">
-            <div className="flex items-start gap-2">
-              <Sparkles3D className="w-8 h-8 shrink-0" />
-              <div className="flex-1 min-w-0">
-                <div className="text-[10px] font-bold text-primary-700 uppercase tracking-wide">
-                  AI Saran Balasan
-                </div>
-                <div className="text-xs text-slate-700 mt-0.5">
-                  &ldquo;Terima kasih Kak. Driver kami akan tiba dalam 15 menit. Mohon
-                  dipersiapkan laundrynya ya.&rdquo;
-                </div>
-                <div className="flex items-center gap-2 mt-2 flex-wrap">
-                  <Button size="sm" variant="primary">
-                    Kirim
-                  </Button>
-                  <Button size="sm" variant="ghost">
-                    Edit
-                  </Button>
-                  <Button size="sm" variant="ghost">
-                    <Sparkles size={12} /> Regenerate
-                  </Button>
-                </div>
-              </div>
-            </div>
+                );
+              })}
           </div>
 
           <div className="p-3 sm:p-4 border-t border-slate-100 flex items-center gap-2">
             <Input
               value={message}
               onChange={(e) => setMessage(e.target.value)}
-              placeholder="Ketik pesan..."
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  sendReply();
+                }
+              }}
+              placeholder={activeChat ? "Ketik pesan..." : "Pilih percakapan dulu"}
               className="flex-1"
+              disabled={!activeChat || sending}
             />
-            <Button size="icon">
+            <Button
+              size="icon"
+              type="button"
+              onClick={sendReply}
+              disabled={!activeChat || !message.trim() || sending}
+            >
               <Send size={16} />
             </Button>
           </div>
